@@ -326,4 +326,29 @@ describe("App interactions", () => {
 
     expect(screen.getByText(/Escalation active: high retry backoff persisted/i)).toBeTruthy();
   });
+
+  it("acknowledges active escalation from profile tools", () => {
+    const now = Date.now();
+    window.localStorage.setItem("cidfeed.ui.retryHighStreak", "3");
+    window.localStorage.setItem(
+      "cidfeed.ui.failedFlushQueue",
+      JSON.stringify([
+        {
+          revocationId: "revoke-escalation-ack-1",
+          failedAt: now - 60_000,
+          retryCount: 6,
+          nextRetryAt: now - 1000,
+          lastError: "tauri flush failed"
+        }
+      ])
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Acknowledge Escalation" }));
+
+    expect(screen.getByText("Escalation acknowledged.")).toBeTruthy();
+    expect(screen.getByText(/Escalation acknowledged at:/i)).toBeTruthy();
+    expect(screen.getByText("revocation.verified")).toBeTruthy();
+  });
 });

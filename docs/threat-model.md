@@ -40,3 +40,4 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Profile now surfaces security warnings when revocation policy is unsafe (`invalid-signature`/`untrusted-issuer`) or replay queues accumulate.
 - Profile now surfaces retry backoff severity and next retry window to reduce stale offline revocation state.
 - Escalation banner now activates after repeated high-severity retry intervals to force operator attention on replay path degradation.
+- Escalation acknowledgement is now explicitly captured in local state and audit log for operator accountability.

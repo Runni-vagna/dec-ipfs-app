@@ -101,7 +101,8 @@ const STORAGE_KEYS = {
   trustedRevocationIssuers: "cidfeed.ui.trustedRevocationIssuers",
   auditLog: "cidfeed.ui.securityAuditLog",
   failedFlushQueue: "cidfeed.ui.failedFlushQueue",
-  retryHighStreak: "cidfeed.ui.retryHighStreak"
+  retryHighStreak: "cidfeed.ui.retryHighStreak",
+  retryEscalationAcknowledgedAt: "cidfeed.ui.retryEscalationAcknowledgedAt"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -204,6 +205,14 @@ export const App = () => {
     const raw = window.localStorage.getItem(STORAGE_KEYS.retryHighStreak);
     const parsed = raw ? Number(raw) : 0;
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+  });
+  const [retryEscalationAcknowledgedAt, setRetryEscalationAcknowledgedAt] = useState<number | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    const raw = window.localStorage.getItem(STORAGE_KEYS.retryEscalationAcknowledgedAt);
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   });
 
   const recordSecurityEvent = (
@@ -326,6 +335,10 @@ export const App = () => {
     revocationQueue.length
   ]);
   const retryEscalationActive = useMemo(() => retryHighStreak >= 3, [retryHighStreak]);
+  const retryEscalationAcknowledged = useMemo(
+    () => retryEscalationActive && retryEscalationAcknowledgedAt !== null,
+    [retryEscalationActive, retryEscalationAcknowledgedAt]
+  );
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -560,6 +573,15 @@ export const App = () => {
   }, [failedRetryStatus?.severity, timeTick]);
 
   useEffect(() => {
+    if (retryEscalationActive) {
+      return;
+    }
+    if (retryEscalationAcknowledgedAt !== null) {
+      setRetryEscalationAcknowledgedAt(null);
+    }
+  }, [retryEscalationAcknowledgedAt, retryEscalationActive]);
+
+  useEffect(() => {
     if (!securityHydrated) {
       return;
     }
@@ -613,6 +635,14 @@ export const App = () => {
     } else {
       window.localStorage.removeItem(STORAGE_KEYS.retryHighStreak);
     }
+    if (retryEscalationAcknowledgedAt !== null) {
+      window.localStorage.setItem(
+        STORAGE_KEYS.retryEscalationAcknowledgedAt,
+        String(retryEscalationAcknowledgedAt)
+      );
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.retryEscalationAcknowledgedAt);
+    }
 
     void saveSecurityStateCommand({
       identityJson,
@@ -631,6 +661,7 @@ export const App = () => {
     revocationList,
     revocationQueue,
     retryHighStreak,
+    retryEscalationAcknowledgedAt,
     securityHydrated,
     trustedRevocationIssuers
   ]);
@@ -725,6 +756,7 @@ export const App = () => {
     setRevocationList(createRevocationList());
     setTrustedRevocationIssuers([]);
     setRetryHighStreak(0);
+    setRetryEscalationAcknowledgedAt(null);
     setAuditLog([]);
     setFailedFlushQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
@@ -738,6 +770,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.revocationList);
     window.localStorage.removeItem(STORAGE_KEYS.trustedRevocationIssuers);
     window.localStorage.removeItem(STORAGE_KEYS.retryHighStreak);
+    window.localStorage.removeItem(STORAGE_KEYS.retryEscalationAcknowledgedAt);
     window.localStorage.removeItem(STORAGE_KEYS.auditLog);
     window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
     setActionNote("Demo state reset.");
@@ -999,12 +1032,37 @@ export const App = () => {
                     </div>
                   )}
                   {retryEscalationActive && (
-                    <div className="alert-row">
-                      <span>
-                        Escalation active: high retry backoff persisted for {retryHighStreak} interval(s). Review swarm
-                        connectivity and replay pipeline.
-                      </span>
-                    </div>
+                    <>
+                      <div className="alert-row">
+                        <span>
+                          Escalation active: high retry backoff persisted for {retryHighStreak} interval(s). Review
+                          swarm connectivity and replay pipeline.
+                        </span>
+                      </div>
+                      <div className="alert-row">
+                        <button
+                          className="follow secondary"
+                          onClick={() => {
+                            const acknowledgedAt = Date.now();
+                            setRetryEscalationAcknowledgedAt(acknowledgedAt);
+                            recordSecurityEvent(
+                              "revocation.verified",
+                              `escalation acknowledged at ${new Date(acknowledgedAt).toISOString()}`
+                            );
+                            setActionNote("Escalation acknowledged.");
+                          }}
+                        >
+                          Acknowledge Escalation
+                        </button>
+                      </div>
+                      {retryEscalationAcknowledged && (
+                        <div className="alert-row">
+                          <span>
+                            Escalation acknowledged at: {new Date(retryEscalationAcknowledgedAt ?? 0).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

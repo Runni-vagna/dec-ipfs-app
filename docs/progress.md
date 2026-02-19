@@ -148,6 +148,11 @@
   - profile now includes an `Escalation` panel that activates when high backoff severity persists for repeated intervals
   - high-severity streak counter is persisted in local storage (`cidfeed.ui.retryHighStreak`) and reset when risk clears
   - expanded UI tests for escalation banner rendering on persisted high-backoff streak
+- Added escalation acknowledgement flow:
+  - profile escalation panel now includes `Acknowledge Escalation` action
+  - acknowledgement timestamp is persisted (`cidfeed.ui.retryEscalationAcknowledgedAt`) while escalation remains active
+  - acknowledgement emits `revocation.verified` audit entry and user-facing status message
+  - expanded UI tests for escalation acknowledgement and audit rendering
 
 ### Phase Tracking
 
