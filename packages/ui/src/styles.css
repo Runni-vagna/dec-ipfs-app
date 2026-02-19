@@ -305,6 +305,13 @@ button {
   font-size: 0.82rem;
 }
 
+.private-controls {
+  margin-top: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
 .right-rail h2 {
   margin-top: 0;
   margin-bottom: 0.6rem;
@@ -454,6 +461,19 @@ button {
   margin-top: 0.8rem;
   display: flex;
   gap: 0.6rem;
+}
+
+.wizard-step {
+  margin-top: 0.7rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.wizard-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .compose-textarea {

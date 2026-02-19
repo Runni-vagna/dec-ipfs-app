@@ -16,6 +16,8 @@ type FeedItem = {
   tag: Tab | "all";
 };
 
+type WizardMode = "easy" | "private" | null;
+
 type RemovedSnapshot = {
   post: FeedItem;
   index: number;
@@ -77,8 +79,12 @@ export const App = () => {
     }
   });
   const [isWizardOpen, setWizardOpen] = useState(false);
+  const [wizardMode, setWizardMode] = useState<WizardMode>(null);
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
   const [isComposeOpen, setComposeOpen] = useState(false);
   const [isHelpOpen, setHelpOpen] = useState(false);
+  const [privateNodeOnline, setPrivateNodeOnline] = useState(false);
+  const [peerCount, setPeerCount] = useState(0);
   const [draft, setDraft] = useState("");
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [actionNote, setActionNote] = useState("Ready");
@@ -189,6 +195,34 @@ export const App = () => {
     setActionNote("Demo state exported.");
   };
 
+  const openWizard = () => {
+    setWizardMode(null);
+    setWizardStep(1);
+    setWizardOpen(true);
+    setActionNote("Private wizard opened.");
+  };
+
+  const togglePrivateNode = () => {
+    if (privateNodeOnline) {
+      setPrivateNodeOnline(false);
+      setPeerCount(0);
+      setActionNote("Private node stopped.");
+      return;
+    }
+    setPrivateNodeOnline(true);
+    setPeerCount(3);
+    setActionNote("Private node started.");
+  };
+
+  const simulatePeerJoin = () => {
+    if (!privateNodeOnline) {
+      setActionNote("Start private node first.");
+      return;
+    }
+    setPeerCount((count) => count + 1);
+    setActionNote("Peer joined private swarm (mock).");
+  };
+
   const importDemoState = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
@@ -295,6 +329,8 @@ export const App = () => {
     setWizardOpen(false);
     setComposeOpen(false);
     setHelpOpen(false);
+    setPrivateNodeOnline(false);
+    setPeerCount(0);
     setDraft("");
     setUnreadAlerts(0);
     setPosts(DEFAULT_POSTS);
@@ -510,12 +546,18 @@ export const App = () => {
               <button
                 className="cta"
                 onClick={() => {
-                  setWizardOpen(true);
-                  setActionNote("Private wizard opened.");
+                  openWizard();
                 }}
               >
                 Open Wizard
               </button>
+              <div className="private-controls">
+                <button className="follow secondary" onClick={togglePrivateNode}>
+                  {privateNodeOnline ? "Stop Node" : "Start Node"}
+                </button>
+                <button className="follow secondary" onClick={simulatePeerJoin}>Simulate Peer Join</button>
+                <p className="muted">Private status: {privateNodeOnline ? "Online" : "Offline"} · Peers: {peerCount}</p>
+              </div>
             </>
           ) : (
             <>
@@ -645,18 +687,55 @@ export const App = () => {
                   setWizardOpen(false);
                 }}
               >
-                Easy Mode
+                Quick Start
               </button>
               <button
                 className="follow"
                 onClick={() => {
-                  setActionNote("Private Swarm selected (mock).");
-                  setWizardOpen(false);
+                  setWizardMode("private");
+                  setWizardStep(2);
+                  setActionNote("Private mode selected.");
                 }}
               >
-                Private Swarm
+                Advanced Flow
               </button>
             </div>
+            <div className="wizard-step">Step {wizardStep} / 3</div>
+            {wizardStep === 1 && (
+              <div className="wizard-body">
+                <button className="follow secondary" onClick={() => { setWizardMode("easy"); setWizardStep(2); }}>
+                  Easy Mode (public peers)
+                </button>
+                <button className="follow secondary" onClick={() => { setWizardMode("private"); setWizardStep(2); }}>
+                  Private Mode (swarm key)
+                </button>
+              </div>
+            )}
+            {wizardStep === 2 && (
+              <div className="wizard-body">
+                <p className="muted">
+                  Mode selected: <strong>{wizardMode === "private" ? "Private" : "Easy"}</strong>
+                </p>
+                <button className="follow secondary" onClick={() => setWizardStep(1)}>Back</button>
+                <button className="cta" onClick={() => setWizardStep(3)}>Generate Config</button>
+              </div>
+            )}
+            {wizardStep === 3 && (
+              <div className="wizard-body">
+                <p className="muted">Configuration generated (mock). You can now start the node.</p>
+                <button
+                  className="cta"
+                  onClick={() => {
+                    setPrivateNodeOnline(true);
+                    setPeerCount(wizardMode === "private" ? 2 : 4);
+                    setWizardOpen(false);
+                    setActionNote("Wizard complete. Node started.");
+                  }}
+                >
+                  Finish & Start Node
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
