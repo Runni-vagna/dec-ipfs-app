@@ -5,7 +5,7 @@
  * Immutability: CIDs are permanent
  */
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Bell, Compass, Home, Plus, Search, Shield, User, X } from "lucide-react";
 
 type Tab = "main" | "discover" | "private" | "alerts" | "profile";
@@ -16,21 +16,61 @@ type FeedItem = {
   tag: Tab | "all";
 };
 
+const STORAGE_KEYS = {
+  tab: "cidfeed.ui.activeTab",
+  posts: "cidfeed.ui.posts",
+  follows: "cidfeed.ui.follows"
+} as const;
+
+const DEFAULT_POSTS: FeedItem[] = [
+  { cid: "bafybeigd", body: "CIDFeed content sharing post", tag: "main" },
+  { cid: "bafybeih2", body: "Swarm update: private peers online", tag: "private" },
+  { cid: "bafybeiak", body: "OrbitDB sync in 642ms", tag: "discover" },
+  { cid: "bafybeip7", body: "Published immutable post CID", tag: "alerts" }
+];
+
+const parseTab = (value: string | null): Tab => {
+  if (value === "main" || value === "discover" || value === "private" || value === "alerts" || value === "profile") {
+    return value;
+  }
+  return "main";
+};
+
 export const App = () => {
-  const [activeTab, setActiveTab] = useState<Tab>("main");
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (typeof window === "undefined") {
+      return "main";
+    }
+    return parseTab(window.localStorage.getItem(STORAGE_KEYS.tab));
+  });
   const [isSearchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [followedCids, setFollowedCids] = useState<Record<string, boolean>>({});
+  const [followedCids, setFollowedCids] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") {
+      return {};
+    }
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEYS.follows);
+      return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  });
   const [isWizardOpen, setWizardOpen] = useState(false);
   const [isComposeOpen, setComposeOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [actionNote, setActionNote] = useState("Ready");
-  const [posts, setPosts] = useState<FeedItem[]>([
-    { cid: "bafybeigd", body: "CIDFeed content sharing post", tag: "main" },
-    { cid: "bafybeih2", body: "Swarm update: private peers online", tag: "private" },
-    { cid: "bafybeiak", body: "OrbitDB sync in 642ms", tag: "discover" },
-    { cid: "bafybeip7", body: "Published immutable post CID", tag: "alerts" }
-  ]);
+  const [posts, setPosts] = useState<FeedItem[]>(() => {
+    if (typeof window === "undefined") {
+      return DEFAULT_POSTS;
+    }
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEYS.posts);
+      return raw ? (JSON.parse(raw) as FeedItem[]) : DEFAULT_POSTS;
+    } catch {
+      return DEFAULT_POSTS;
+    }
+  });
 
   const filteredPosts = useMemo(() => {
     const tabFiltered = posts.filter((post) => post.tag === activeTab || post.tag === "all");
@@ -73,6 +113,29 @@ export const App = () => {
     alerts: "Alerts",
     profile: "Profile"
   };
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.tab, activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.posts, JSON.stringify(posts));
+  }, [posts]);
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.follows, JSON.stringify(followedCids));
+  }, [followedCids]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setWizardOpen(false);
+        setComposeOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <div className="app-shell">
@@ -242,7 +305,17 @@ export const App = () => {
       </nav>
 
       {isWizardOpen && (
-        <div className="overlay" role="dialog" aria-modal="true" aria-label="Private node wizard">
+        <div
+          className="overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Private node wizard"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setWizardOpen(false);
+            }
+          }}
+        >
           <div className="modal-card">
             <button className="close-btn" onClick={() => setWizardOpen(false)} aria-label="Close wizard">
               <X size={16} />
@@ -274,7 +347,17 @@ export const App = () => {
       )}
 
       {isComposeOpen && (
-        <div className="overlay" role="dialog" aria-modal="true" aria-label="Compose post">
+        <div
+          className="overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Compose post"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setComposeOpen(false);
+            }
+          }}
+        >
           <div className="modal-card">
             <button className="close-btn" onClick={() => setComposeOpen(false)} aria-label="Close composer">
               <X size={16} />
