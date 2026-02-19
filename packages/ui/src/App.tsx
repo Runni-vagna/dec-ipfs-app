@@ -272,6 +272,17 @@ export const App = () => {
     if (trimmed.length === 0) {
       return;
     }
+    if (delegation) {
+      const status = verifyDelegationRevocation(delegation, revocationList, Date.now());
+      if (status === "revoked" || status === "expired") {
+        recordSecurityEvent(
+          "ucan.verified",
+          `blocked publish because delegation is ${status} for ${formatDidHandle(delegation.audienceDid)}`
+        );
+        setActionNote(`Cannot publish: UCAN is ${status}.`);
+        return;
+      }
+    }
     const post = toFeedPost(createDraftPost(trimmed, activeTab));
     setPosts((current) => prependFeedPost(current, post));
     if (activeTab !== "alerts") {

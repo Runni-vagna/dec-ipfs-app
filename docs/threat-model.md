@@ -34,3 +34,4 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Offline revocation queue primitives exist for local persistence + replay on reconnect.
 - Revocation-list verification path now exists in core (`active`/`expired`/`revoked`) and is surfaced in UI profile status.
 - Revocation list state is persisted via Tauri security-state bridge for offline integrity checks.
+- Compose publish flow now blocks when delegation verification returns `revoked` or `expired`.

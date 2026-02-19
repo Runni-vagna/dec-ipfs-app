@@ -174,4 +174,39 @@ describe("App interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
     expect(screen.getByText("UCAN Revoked")).toBeTruthy();
   });
+
+  it("blocks compose publish when delegation is revoked", () => {
+    const now = Date.now();
+    window.localStorage.setItem(
+      "cidfeed.ui.ucanDelegation",
+      JSON.stringify({
+        issuerDid: "did:key:z123456789ABCDEFGHJKLMN",
+        audienceDid: "did:key:z123456789ABCDEFGHJKLMP",
+        capabilities: [{ with: "did:key:z123456789ABCDEFGHJKLMN", can: "feed/publish" }],
+        issuedAt: now - 1000,
+        expiresAt: now + 3600_000,
+        revocationId: "revoke-blocked-1",
+        nonce: "abc123",
+        version: "1.1"
+      })
+    );
+    window.localStorage.setItem(
+      "cidfeed.ui.revocationList",
+      JSON.stringify({
+        version: "1.1",
+        updatedAt: now,
+        entries: [{ revocationId: "revoke-blocked-1", revokedAt: now, reason: "test block" }]
+      })
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getAllByLabelText("Compose")[0]);
+    fireEvent.change(screen.getByPlaceholderText("Write immutable CID content..."), {
+      target: { value: "Blocked publish content" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Publish Mock Post" }));
+
+    expect(screen.getByText("Cannot publish: UCAN is revoked.")).toBeTruthy();
+    expect(screen.queryByText(/Blocked publish content/i)).toBeNull();
+  });
 });

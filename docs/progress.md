@@ -120,6 +120,10 @@
   - updated profile UI in `packages/ui/src/App.tsx` with delegation verification indicator (`UCAN Active/Expiring Soon/Expired/Revoked`)
   - added profile actions: `Verify UCAN`, `Mark Revoked`, `Clear Revocation List`
   - added UI test coverage for revoked-status rendering in `packages/ui/tests/app.interactions.test.tsx`
+- Enforced delegation status during compose publish:
+  - `packages/ui/src/App.tsx` now blocks publishing when delegation verification resolves to `revoked` or `expired`
+  - blocked publish path records `ucan.verified` audit event and user-facing status message
+  - added UI test for revoked publish block in `packages/ui/tests/app.interactions.test.tsx`
 
 ### Phase Tracking
 
