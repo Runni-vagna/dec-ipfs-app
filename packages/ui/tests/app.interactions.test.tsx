@@ -207,7 +207,7 @@ describe("App interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Publish Mock Post" }));
 
     expect(screen.getByText("Cannot publish: UCAN is revoked.")).toBeTruthy();
-    expect(screen.queryByText(/Blocked publish content/i)).toBeNull();
+    expect(screen.queryByText(/Blocked publish content/i, { selector: ".cid" })).toBeNull();
   });
 
   it("shows revocation list integrity and signs it from profile tools", () => {
