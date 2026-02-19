@@ -45,13 +45,17 @@ import {
   serializeRevocationList,
   serializeSecurityAuditLog,
   serializeIdentityRecord,
+  serializeTrustedDidList,
   serializeUcanDelegation,
   serializeFeedStateSnapshot,
   splitReadyFailedRetries,
   toFeedPost,
   toggleFlag,
+  parseTrustedDidList,
+  isRevocationListIssuerTrusted,
   signRevocationList,
   upsertFailedRevocationRetries,
+  verifyRevocationListPolicy,
   verifyRevocationListSignature,
   verifyDelegationRevocation
 } from "../src";
@@ -358,6 +362,28 @@ describe("ucan and revocation helpers", () => {
       })
     );
     expect(verifyRevocationListSignature(tampered)).toBe(false);
+  });
+
+  it("enforces trusted issuer policy for revocation list", () => {
+    const unsigned = parseRevocationList(
+      JSON.stringify({
+        version: "1.1",
+        updatedAt: 1700000020000,
+        entries: [{ revocationId: "revoke-1", revokedAt: 1700000020000, reason: "manual revoke" }]
+      })
+    );
+    const signed = signRevocationList(unsigned, issuer);
+    expect(verifyRevocationListPolicy(signed, [])).toBe("untrusted-issuer");
+    expect(isRevocationListIssuerTrusted(signed, [issuer])).toBe(true);
+    expect(verifyRevocationListPolicy(signed, [issuer])).toBe("valid");
+  });
+
+  it("serializes and parses trusted did list safely", () => {
+    const raw = serializeTrustedDidList([issuer, "invalid", issuer]);
+    const parsed = parseTrustedDidList(raw);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toBe(issuer);
+    expect(parseTrustedDidList("bad-json")).toHaveLength(0);
   });
 });
 

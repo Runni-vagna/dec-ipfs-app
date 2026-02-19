@@ -39,6 +39,7 @@ struct SecurityState {
     delegation_json: Option<String>,
     revocation_queue_json: Option<String>,
     revocation_list_json: Option<String>,
+    trusted_revocation_issuers_json: Option<String>,
     audit_log_json: Option<String>,
     failed_flush_queue_json: Option<String>,
 }
@@ -186,6 +187,7 @@ fn set_security_state(
     delegation_json: Option<String>,
     revocation_queue_json: Option<String>,
     revocation_list_json: Option<String>,
+    trusted_revocation_issuers_json: Option<String>,
     audit_log_json: Option<String>,
     failed_flush_queue_json: Option<String>,
 ) {
@@ -197,6 +199,7 @@ fn set_security_state(
     guard.delegation_json = normalize_json_string(delegation_json);
     guard.revocation_queue_json = normalize_json_string(revocation_queue_json);
     guard.revocation_list_json = normalize_json_string(revocation_list_json);
+    guard.trusted_revocation_issuers_json = normalize_json_string(trusted_revocation_issuers_json);
     guard.audit_log_json = normalize_json_string(audit_log_json);
     guard.failed_flush_queue_json = normalize_json_string(failed_flush_queue_json);
     persist_security_state(&state.security_state_path, &guard);

@@ -130,6 +130,12 @@
   - added core tests for signed/tampered revocation-list verification behavior
   - profile UI now shows revocation-list integrity state and includes `Sign Revocation List` / `Verify Revocation List` actions
   - added UI test that signs an unverified list and verifies status changes to `Verified`
+- Added issuer trust policy for revocation-list verification:
+  - added core policy helpers in `packages/core/src/index.ts`: trusted DID list parse/serialize, issuer trust check, and policy verification (`valid` / `untrusted-issuer` / `invalid-signature`)
+  - expanded core tests for trust-policy outcomes and trusted DID list parsing
+  - extended Tauri security-state schema with `trusted_revocation_issuers_json`
+  - wired UI persistence + profile controls for `Trust Issuer` / `Untrust Issuer`
+  - profile now displays revocation-list policy status and UI tests cover policy transition to `valid` after trusting issuer
 
 ### Phase Tracking
 

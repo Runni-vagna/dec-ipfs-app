@@ -237,10 +237,16 @@ describe("App interactions", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
     expect(screen.getByText("Revocation list integrity: Unverified")).toBeTruthy();
+    expect(screen.getByText("Revocation list policy: invalid-signature")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Create DID" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign Revocation List" }));
     expect(screen.getByText("Revocation list signed.")).toBeTruthy();
     expect(screen.getByText("Revocation list integrity: Verified")).toBeTruthy();
+    expect(screen.getByText("Revocation list policy: untrusted-issuer")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Trust Issuer" }));
+    expect(screen.getByText("Revocation list issuer trusted.")).toBeTruthy();
+    expect(screen.getByText("Revocation list policy: valid")).toBeTruthy();
   });
 });

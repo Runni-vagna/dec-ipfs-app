@@ -26,6 +26,7 @@ import {
   parseFailedRevocationRetries,
   parseOfflineRevocationQueue,
   parseIdentityRecord,
+  parseTrustedDidList,
   parseRevocationList,
   parseActiveTab,
   parseUcanDelegation,
@@ -43,6 +44,7 @@ import {
   serializeIdentityRecord,
   serializeRevocationList,
   serializeSecurityAuditLog,
+  serializeTrustedDidList,
   serializeUcanDelegation,
   serializeFeedStateSnapshot,
   toFeedPost,
@@ -57,6 +59,7 @@ import {
   type SecurityAuditEntry,
   type UcanDelegationRecord,
   upsertFailedRevocationRetries,
+  verifyRevocationListPolicy,
   verifyRevocationListSignature,
   verifyDelegationRevocation
 } from "@cidfeed/core";
@@ -95,6 +98,7 @@ const STORAGE_KEYS = {
   ucan: "cidfeed.ui.ucanDelegation",
   revocations: "cidfeed.ui.offlineRevocationQueue",
   revocationList: "cidfeed.ui.revocationList",
+  trustedRevocationIssuers: "cidfeed.ui.trustedRevocationIssuers",
   auditLog: "cidfeed.ui.securityAuditLog",
   failedFlushQueue: "cidfeed.ui.failedFlushQueue"
 } as const;
@@ -167,6 +171,12 @@ export const App = () => {
       return createRevocationList();
     }
     return parseRevocationList(window.localStorage.getItem(STORAGE_KEYS.revocationList));
+  });
+  const [trustedRevocationIssuers, setTrustedRevocationIssuers] = useState<string[]>(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+    return parseTrustedDidList(window.localStorage.getItem(STORAGE_KEYS.trustedRevocationIssuers));
   });
   const [auditLog, setAuditLog] = useState<SecurityAuditEntry[]>(() => {
     if (typeof window === "undefined") {
@@ -262,6 +272,10 @@ export const App = () => {
     return verifyDelegationRevocation(delegation, revocationList, timeTick);
   }, [delegation, revocationList, timeTick]);
   const revocationListIntegrity = useMemo(() => verifyRevocationListSignature(revocationList), [revocationList]);
+  const revocationListPolicyStatus = useMemo(
+    () => verifyRevocationListPolicy(revocationList, trustedRevocationIssuers),
+    [revocationList, trustedRevocationIssuers]
+  );
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -473,6 +487,7 @@ export const App = () => {
         setDelegation(parseUcanDelegation(payload.delegationJson));
         setRevocationQueue(parseOfflineRevocationQueue(payload.revocationQueueJson));
         setRevocationList(parseRevocationList(payload.revocationListJson));
+        setTrustedRevocationIssuers(parseTrustedDidList(payload.trustedRevocationIssuersJson));
         setAuditLog(parseSecurityAuditLog(payload.auditLogJson));
         setFailedFlushQueue(parseFailedRevocationRetries(payload.failedFlushQueueJson));
       }
@@ -493,6 +508,8 @@ export const App = () => {
     const delegationJson = delegation ? serializeUcanDelegation(delegation) : null;
     const revocationQueueJson = revocationQueue.length > 0 ? serializeOfflineRevocationQueue(revocationQueue) : null;
     const revocationListJson = revocationList.entries.length > 0 ? serializeRevocationList(revocationList) : null;
+    const trustedRevocationIssuersJson =
+      trustedRevocationIssuers.length > 0 ? serializeTrustedDidList(trustedRevocationIssuers) : null;
     const auditLogJson = auditLog.length > 0 ? serializeSecurityAuditLog(auditLog) : null;
     const failedFlushQueueJson =
       failedFlushQueue.length > 0 ? serializeFailedRevocationRetries(failedFlushQueue) : null;
@@ -517,6 +534,11 @@ export const App = () => {
     } else {
       window.localStorage.removeItem(STORAGE_KEYS.revocationList);
     }
+    if (trustedRevocationIssuersJson) {
+      window.localStorage.setItem(STORAGE_KEYS.trustedRevocationIssuers, trustedRevocationIssuersJson);
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.trustedRevocationIssuers);
+    }
     if (auditLogJson) {
       window.localStorage.setItem(STORAGE_KEYS.auditLog, auditLogJson);
     } else {
@@ -533,10 +555,20 @@ export const App = () => {
       delegationJson,
       revocationQueueJson,
       revocationListJson,
+      trustedRevocationIssuersJson,
       auditLogJson,
       failedFlushQueueJson
     });
-  }, [auditLog, delegation, failedFlushQueue, identity, revocationList, revocationQueue, securityHydrated]);
+  }, [
+    auditLog,
+    delegation,
+    failedFlushQueue,
+    identity,
+    revocationList,
+    revocationQueue,
+    securityHydrated,
+    trustedRevocationIssuers
+  ]);
 
   useEffect(() => {
     if (activeTab === "alerts" && unreadAlerts > 0) {
@@ -626,6 +658,7 @@ export const App = () => {
     setDelegation(null);
     setRevocationQueue([]);
     setRevocationList(createRevocationList());
+    setTrustedRevocationIssuers([]);
     setAuditLog([]);
     setFailedFlushQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
@@ -637,6 +670,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.ucan);
     window.localStorage.removeItem(STORAGE_KEYS.revocations);
     window.localStorage.removeItem(STORAGE_KEYS.revocationList);
+    window.localStorage.removeItem(STORAGE_KEYS.trustedRevocationIssuers);
     window.localStorage.removeItem(STORAGE_KEYS.auditLog);
     window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
     setActionNote("Demo state reset.");
@@ -884,6 +918,9 @@ export const App = () => {
                   <p className="muted">
                     Revocation list integrity: {revocationListIntegrity ? "Verified" : "Unverified"}
                   </p>
+                  <p className="muted">
+                    Revocation list policy: {revocationListPolicyStatus}
+                  </p>
                 </>
               )}
               <div className="alerts-panel">
@@ -1105,6 +1142,43 @@ export const App = () => {
                   }}
                 >
                   Verify Revocation List
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    const issuerDid = revocationList.issuerDid;
+                    if (!issuerDid) {
+                      setActionNote("Revocation list has no issuer DID to trust.");
+                      return;
+                    }
+                    setTrustedRevocationIssuers((current) => {
+                      if (current.includes(issuerDid)) {
+                        return current;
+                      }
+                      return [...current, issuerDid];
+                    });
+                    recordSecurityEvent("revocation.verified", `trusted issuer ${issuerDid}`);
+                    setActionNote("Revocation list issuer trusted.");
+                  }}
+                >
+                  Trust Issuer
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    const issuerDid = revocationList.issuerDid;
+                    if (!issuerDid) {
+                      setActionNote("Revocation list has no issuer DID to untrust.");
+                      return;
+                    }
+                    setTrustedRevocationIssuers((current) =>
+                      current.filter((did) => did !== issuerDid)
+                    );
+                    recordSecurityEvent("revocation.verified", `removed trusted issuer ${issuerDid}`);
+                    setActionNote("Revocation list issuer removed from trust list.");
+                  }}
+                >
+                  Untrust Issuer
                 </button>
                 <button
                   className="follow secondary"

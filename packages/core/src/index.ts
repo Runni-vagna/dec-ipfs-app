@@ -48,6 +48,7 @@ export type RevocationListRecord = {
   readonly signature: string | null;
   readonly entries: RevocationListEntry[];
 };
+export type RevocationListPolicyStatus = "valid" | "untrusted-issuer" | "invalid-signature";
 export type RevocationReplayResult = {
   readonly replayed: OfflineRevocationEntry[];
   readonly remaining: OfflineRevocationEntry[];
@@ -723,6 +724,55 @@ export const verifyRevocationListSignature = (list: RevocationListRecord): boole
   }
   const expected = `sig-${fnv1aHex(createRevocationListSigningPayload(list, list.issuerDid))}`;
   return expected === list.signature;
+};
+
+export const serializeTrustedDidList = (trustedDidList: readonly string[]): string => {
+  const normalized = [...new Set(trustedDidList.map((entry) => entry.trim()).filter((entry) => isValidDidKey(entry)))];
+  return JSON.stringify(normalized);
+};
+
+export const parseTrustedDidList = (raw: string | null | undefined): string[] => {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  const normalized = [...new Set(parsed.map((entry) => (typeof entry === "string" ? entry.trim() : "")).filter((entry) => isValidDidKey(entry)))];
+  return normalized;
+};
+
+export const isRevocationListIssuerTrusted = (
+  list: RevocationListRecord,
+  trustedDidList: readonly string[]
+): boolean => {
+  if (list.entries.length === 0) {
+    return true;
+  }
+  if (!list.issuerDid || !isValidDidKey(list.issuerDid)) {
+    return false;
+  }
+  const trusted = new Set(parseTrustedDidList(serializeTrustedDidList(trustedDidList)));
+  return trusted.has(list.issuerDid);
+};
+
+export const verifyRevocationListPolicy = (
+  list: RevocationListRecord,
+  trustedDidList: readonly string[]
+): RevocationListPolicyStatus => {
+  if (!verifyRevocationListSignature(list)) {
+    return "invalid-signature";
+  }
+  if (!isRevocationListIssuerTrusted(list, trustedDidList)) {
+    return "untrusted-issuer";
+  }
+  return "valid";
 };
 
 export const serializeRevocationList = (list: RevocationListRecord): string => {
