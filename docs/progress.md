@@ -178,6 +178,9 @@
   - profile now shows `Cancel Unsafe Override` while temporary override is active
   - cancel action clears override immediately, restores strict safe replay behavior, and records an audit entry
   - expanded UI tests for immediate override cancellation flow
+- Added compact replay safety summary row:
+  - profile now shows `Replay safety state` summary (`policy`, `safeOnly`, `override`) above replay controls
+  - expanded UI tests for default replay safety summary visibility
 
 ### Phase Tracking
 

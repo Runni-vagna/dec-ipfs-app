@@ -1326,6 +1326,11 @@ export const App = () => {
                 >
                   Revoke UCAN
                 </button>
+                <div className="alert-row">
+                  <span className="muted">
+                    Replay safety state: policy={revocationListPolicyStatus} · safeOnly={safeReplayOnly ? "on" : "off"} · override={unsafeReplayOverrideActive ? "active" : "inactive"}
+                  </span>
+                </div>
                 <button
                   className="follow secondary"
                   onClick={() => {

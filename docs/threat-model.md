@@ -47,3 +47,4 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Temporary unsafe replay override (5-minute TTL) exists for emergency recovery, with audit logging and automatic expiry.
 - Override UX now includes countdown + disabled re-arm to reduce operator error during emergency bypass windows.
 - Emergency override can now be cancelled instantly from profile to restore strict replay safety.
+- Profile now surfaces a compact replay safety state summary to reduce operator ambiguity before replay actions.

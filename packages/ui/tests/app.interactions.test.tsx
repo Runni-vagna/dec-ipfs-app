@@ -31,6 +31,8 @@ describe("App interactions", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
     expect(screen.getByRole("button", { name: "Safe Replay Only: On" })).toBeTruthy();
+    expect(screen.getByText(/Replay safety state: policy=valid/i)).toBeTruthy();
+    expect(screen.getByText(/safeOnly=on/i)).toBeTruthy();
   });
 
   it("publishes a mock post from compose modal", () => {
