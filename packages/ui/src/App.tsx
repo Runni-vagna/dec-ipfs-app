@@ -63,6 +63,7 @@ import {
 
 type Tab = ActiveTab;
 type AuditFilter = "all" | "identity" | "ucan" | "revocation";
+type AuditSort = "newest" | "oldest";
 
 type FeedItem = FeedPost;
 
@@ -152,6 +153,8 @@ export const App = () => {
     return parseSecurityAuditLog(window.localStorage.getItem(STORAGE_KEYS.auditLog));
   });
   const [auditFilter, setAuditFilter] = useState<AuditFilter>("all");
+  const [auditQuery, setAuditQuery] = useState("");
+  const [auditSort, setAuditSort] = useState<AuditSort>("newest");
   const [securityHydrated, setSecurityHydrated] = useState(false);
   const [timeTick, setTimeTick] = useState(() => Date.now());
 
@@ -192,17 +195,28 @@ export const App = () => {
   }, [activeTab, pinnedOnly, pinnedCids, posts, query]);
 
   const filteredAuditLog = useMemo(() => {
-    if (auditFilter === "all") {
-      return auditLog;
-    }
-    if (auditFilter === "identity") {
-      return auditLog.filter((entry) => entry.event.startsWith("identity."));
-    }
-    if (auditFilter === "ucan") {
-      return auditLog.filter((entry) => entry.event.startsWith("ucan."));
-    }
-    return auditLog.filter((entry) => entry.event.startsWith("revocation."));
-  }, [auditFilter, auditLog]);
+    const byFilter =
+      auditFilter === "all"
+        ? auditLog
+        : auditFilter === "identity"
+          ? auditLog.filter((entry) => entry.event.startsWith("identity."))
+          : auditFilter === "ucan"
+            ? auditLog.filter((entry) => entry.event.startsWith("ucan."))
+            : auditLog.filter((entry) => entry.event.startsWith("revocation."));
+
+    const lowered = auditQuery.trim().toLowerCase();
+    const byQuery =
+      lowered.length === 0
+        ? byFilter
+        : byFilter.filter(
+            (entry) => entry.event.toLowerCase().includes(lowered) || entry.detail.toLowerCase().includes(lowered)
+          );
+
+    const sorted = [...byQuery].sort((left, right) =>
+      auditSort === "newest" ? right.timestamp - left.timestamp : left.timestamp - right.timestamp
+    );
+    return sorted;
+  }, [auditFilter, auditLog, auditQuery, auditSort]);
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -786,6 +800,24 @@ export const App = () => {
               )}
               <div className="alerts-panel">
                 <h3>Security Audit</h3>
+                <div className="search-wrap">
+                  <input
+                    className="search-input"
+                    value={auditQuery}
+                    onChange={(event) => setAuditQuery(event.target.value)}
+                    placeholder="Search audit events"
+                    aria-label="Search audit events"
+                  />
+                  {auditQuery.length > 0 && (
+                    <button
+                      className="clear-search"
+                      aria-label="Clear audit search"
+                      onClick={() => setAuditQuery("")}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
                 <div className="profile-actions">
                   <button
                     className={auditFilter === "all" ? "follow following" : "follow secondary"}
@@ -810,6 +842,18 @@ export const App = () => {
                     onClick={() => setAuditFilter("revocation")}
                   >
                     Revocations
+                  </button>
+                  <button
+                    className={auditSort === "newest" ? "follow following" : "follow secondary"}
+                    onClick={() => setAuditSort("newest")}
+                  >
+                    Newest
+                  </button>
+                  <button
+                    className={auditSort === "oldest" ? "follow following" : "follow secondary"}
+                    onClick={() => setAuditSort("oldest")}
+                  >
+                    Oldest
                   </button>
                 </div>
                 <div className="alerts-list">

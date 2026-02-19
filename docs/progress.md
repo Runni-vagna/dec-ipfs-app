@@ -94,6 +94,10 @@
 - Improved revocation flush result handling:
   - Tauri `flush_revocation_queue` now returns per-item result groups (`flushedIds`, `failedIds`)
   - UI replay action now reports both success and failure counts in status + audit event detail
+- Added audit exploration controls:
+  - profile security audit panel now supports text search across event + detail fields
+  - added chronological sort controls (`Newest` / `Oldest`) for audit entries
+  - expanded UI interaction tests for audit search behavior (`7` UI tests passing)
 
 ### Phase Tracking
 

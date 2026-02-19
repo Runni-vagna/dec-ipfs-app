@@ -85,4 +85,19 @@ describe("App interactions", () => {
     expect(screen.queryByText("identity.created")).toBeNull();
     expect(screen.getByText("No security actions recorded yet.")).toBeTruthy();
   });
+
+  it("filters security audit entries by search query", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create DID" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create UCAN" }));
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search audit events" }), {
+      target: { value: "ucan.created" }
+    });
+
+    expect(screen.getByText("ucan.created")).toBeTruthy();
+    expect(screen.queryByText("identity.created")).toBeNull();
+  });
 });
