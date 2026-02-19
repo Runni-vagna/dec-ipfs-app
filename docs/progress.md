@@ -111,6 +111,8 @@
 - Validation status (current environment):
   - `pnpm test`: blocked (`env: 'node': No such file or directory`)
   - `pnpm typecheck`: blocked (`env: 'node': No such file or directory`)
+- Added UI regression coverage for failed retry queue action:
+  - `packages/ui/tests/app.interactions.test.tsx` now validates `Retry Failed Flushes` re-queues ready retries and replay drains the queue
 
 ### Phase Tracking
 

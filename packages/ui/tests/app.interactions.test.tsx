@@ -114,4 +114,28 @@ describe("App interactions", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByText("Audit Entry")).toBeNull();
   });
+
+  it("re-queues ready failed flush retries from profile tools", () => {
+    window.localStorage.setItem(
+      "cidfeed.ui.failedFlushQueue",
+      JSON.stringify([
+        {
+          revocationId: "fail-revoke-ready",
+          failedAt: 1000,
+          retryCount: 1,
+          nextRetryAt: 1000,
+          lastError: "tauri flush failed"
+        }
+      ])
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry Failed Flushes" }));
+    expect(screen.getByText("Re-queued 1 failed revocation(s).")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
+    expect(screen.getByText(/Replayed 1 queued revocation\(s\)\./i)).toBeTruthy();
+  });
 });
