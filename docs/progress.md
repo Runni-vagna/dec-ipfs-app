@@ -18,6 +18,9 @@
   - `.github/workflows/ci.yml` created with two jobs:
     - workspace checks (`typecheck`, `@cidfeed/core build`, `@cidfeed/ui build`)
     - Linux Tauri build with WebKitGTK dependencies installed on runner
+- CI hardening (after first public run):
+  - expanded Linux Tauri dependency install list (`build-essential`, `pkg-config`, `libssl-dev`, `libglib2.0-dev`, `libxdo-dev`)
+  - added `tauri-build.log` artifact upload (`if: always()`) for actionable failure diagnostics
 
 ### Phase Tracking
 
