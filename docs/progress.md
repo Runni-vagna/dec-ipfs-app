@@ -70,6 +70,10 @@
   - added `replayOfflineRevocations` batch helper in `packages/core/src/index.ts`
   - wired `Replay Revocations` profile action in `packages/ui/src/App.tsx` to drain queue and report replay count
   - expanded core and UI tests to cover replay behavior (`20` core tests passing; `5` UI tests passing)
+- Migrated identity/UCAN/revocation persistence to Tauri app-data bridge:
+  - added `get_security_state` / `set_security_state` commands in `packages/tauri/src-tauri/src/main.rs` with persisted `security-state.json`
+  - added UI Tauri bridge module `packages/ui/src/tauri-security-state.ts`
+  - updated `packages/ui/src/App.tsx` to hydrate security state from Tauri on startup and persist updates to both Tauri storage and local fallback storage
 
 ### Phase Tracking
 

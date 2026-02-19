@@ -49,6 +49,7 @@ import {
   type NodeStartMode,
   type PrivateNodeStatus
 } from "./tauri-private-node";
+import { loadSecurityStateCommand, saveSecurityStateCommand } from "./tauri-security-state";
 
 type Tab = ActiveTab;
 
@@ -132,6 +133,7 @@ export const App = () => {
     }
     return parseOfflineRevocationQueue(window.localStorage.getItem(STORAGE_KEYS.revocations));
   });
+  const [securityHydrated, setSecurityHydrated] = useState(false);
   const [privateNodeOnline, setPrivateNodeOnline] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
   const [draft, setDraft] = useState("");
@@ -342,28 +344,47 @@ export const App = () => {
   }, [unreadAlerts]);
 
   useEffect(() => {
-    if (!identity) {
+    void (async () => {
+      const payload = await loadSecurityStateCommand();
+      if (payload) {
+        setIdentity(parseIdentityRecord(payload.identityJson));
+        setDelegation(parseUcanDelegation(payload.delegationJson));
+        setRevocationQueue(parseOfflineRevocationQueue(payload.revocationQueueJson));
+      }
+      setSecurityHydrated(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!securityHydrated) {
+      return;
+    }
+    const identityJson = identity ? serializeIdentityRecord(identity) : null;
+    const delegationJson = delegation ? serializeUcanDelegation(delegation) : null;
+    const revocationQueueJson = revocationQueue.length > 0 ? serializeOfflineRevocationQueue(revocationQueue) : null;
+
+    if (identityJson) {
+      window.localStorage.setItem(STORAGE_KEYS.identity, identityJson);
+    } else {
       window.localStorage.removeItem(STORAGE_KEYS.identity);
-      return;
     }
-    window.localStorage.setItem(STORAGE_KEYS.identity, serializeIdentityRecord(identity));
-  }, [identity]);
-
-  useEffect(() => {
-    if (!delegation) {
+    if (delegationJson) {
+      window.localStorage.setItem(STORAGE_KEYS.ucan, delegationJson);
+    } else {
       window.localStorage.removeItem(STORAGE_KEYS.ucan);
-      return;
     }
-    window.localStorage.setItem(STORAGE_KEYS.ucan, serializeUcanDelegation(delegation));
-  }, [delegation]);
-
-  useEffect(() => {
-    if (revocationQueue.length === 0) {
+    if (revocationQueueJson) {
+      window.localStorage.setItem(STORAGE_KEYS.revocations, revocationQueueJson);
+    } else {
       window.localStorage.removeItem(STORAGE_KEYS.revocations);
-      return;
     }
-    window.localStorage.setItem(STORAGE_KEYS.revocations, serializeOfflineRevocationQueue(revocationQueue));
-  }, [revocationQueue]);
+
+    void saveSecurityStateCommand({
+      identityJson,
+      delegationJson,
+      revocationQueueJson
+    });
+  }, [delegation, identity, revocationQueue, securityHydrated]);
 
   useEffect(() => {
     if (activeTab === "alerts" && unreadAlerts > 0) {

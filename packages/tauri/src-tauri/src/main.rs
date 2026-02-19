@@ -15,6 +15,8 @@ use tauri::{AppHandle, Manager, State};
 struct AppState {
     private_node: Mutex<PrivateNodeState>,
     private_node_state_path: PathBuf,
+    security_state: Mutex<SecurityState>,
+    security_state_path: PathBuf,
 }
 
 #[derive(Clone, Default, Deserialize, Serialize)]
@@ -30,6 +32,14 @@ struct PrivateNodeStatus {
     peer_count: u16,
 }
 
+#[derive(Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SecurityState {
+    identity_json: Option<String>,
+    delegation_json: Option<String>,
+    revocation_queue_json: Option<String>,
+}
+
 fn to_status(state: &PrivateNodeState) -> PrivateNodeStatus {
     PrivateNodeStatus {
         online: state.online,
@@ -37,10 +47,10 @@ fn to_status(state: &PrivateNodeState) -> PrivateNodeStatus {
     }
 }
 
-fn resolve_state_path(handle: &AppHandle) -> PathBuf {
+fn resolve_state_path(handle: &AppHandle, file_name: &str) -> PathBuf {
     match handle.path().app_data_dir() {
-        Ok(dir) => dir.join("private-node-state.json"),
-        Err(_) => PathBuf::from("private-node-state.json"),
+        Ok(dir) => dir.join(file_name),
+        Err(_) => PathBuf::from(file_name),
     }
 }
 
@@ -61,6 +71,39 @@ fn persist_private_node_state(path: &PathBuf, state: &PrivateNodeState) {
         }
     }
     let _ = fs::write(path, encoded);
+}
+
+fn load_security_state(path: &PathBuf) -> SecurityState {
+    let Ok(raw) = fs::read_to_string(path) else {
+        return SecurityState::default();
+    };
+    serde_json::from_str::<SecurityState>(&raw).unwrap_or_default()
+}
+
+fn persist_security_state(path: &PathBuf, state: &SecurityState) {
+    let Ok(encoded) = serde_json::to_string(state) else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        if fs::create_dir_all(parent).is_err() {
+            return;
+        }
+    }
+    let _ = fs::write(path, encoded);
+}
+
+fn normalize_json_string(value: Option<String>) -> Option<String> {
+    match value {
+        Some(raw) => {
+            let normalized = raw.trim().to_string();
+            if normalized.is_empty() {
+                None
+            } else {
+                Some(normalized)
+            }
+        }
+        None => None,
+    }
 }
 
 #[tauri::command]
@@ -117,14 +160,44 @@ fn simulate_peer_join(state: State<'_, AppState>) -> PrivateNodeStatus {
     to_status(&guard)
 }
 
+#[tauri::command]
+fn get_security_state(state: State<'_, AppState>) -> SecurityState {
+    let guard = state
+        .security_state
+        .lock()
+        .expect("security state mutex poisoned");
+    guard.clone()
+}
+
+#[tauri::command]
+fn set_security_state(
+    state: State<'_, AppState>,
+    identity_json: Option<String>,
+    delegation_json: Option<String>,
+    revocation_queue_json: Option<String>,
+) {
+    let mut guard = state
+        .security_state
+        .lock()
+        .expect("security state mutex poisoned");
+    guard.identity_json = normalize_json_string(identity_json);
+    guard.delegation_json = normalize_json_string(delegation_json);
+    guard.revocation_queue_json = normalize_json_string(revocation_queue_json);
+    persist_security_state(&state.security_state_path, &guard);
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            let state_path = resolve_state_path(app.handle());
-            let private_node = load_private_node_state(&state_path);
+            let private_node_path = resolve_state_path(app.handle(), "private-node-state.json");
+            let security_state_path = resolve_state_path(app.handle(), "security-state.json");
+            let private_node = load_private_node_state(&private_node_path);
+            let security_state = load_security_state(&security_state_path);
             app.manage(AppState {
                 private_node: Mutex::new(private_node),
-                private_node_state_path: state_path,
+                private_node_state_path: private_node_path,
+                security_state: Mutex::new(security_state),
+                security_state_path,
             });
             Ok(())
         })
@@ -133,7 +206,9 @@ fn main() {
             start_private_node,
             start_private_node_mode,
             stop_private_node,
-            simulate_peer_join
+            simulate_peer_join,
+            get_security_state,
+            set_security_state
         ])
         .run(tauri::generate_context!())
         .expect("error while running CIDFeed Tauri app");
