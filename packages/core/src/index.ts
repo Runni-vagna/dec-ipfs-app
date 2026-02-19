@@ -17,6 +17,25 @@ export type IdentityRecord = {
   readonly did: string;
   readonly createdAt: string;
 };
+export type UcanCapability = {
+  readonly with: string;
+  readonly can: string;
+};
+export type UcanDelegationRecord = {
+  readonly issuerDid: string;
+  readonly audienceDid: string;
+  readonly capabilities: UcanCapability[];
+  readonly issuedAt: number;
+  readonly expiresAt: number;
+  readonly revocationId: string;
+  readonly nonce: string;
+  readonly version: "1.1";
+};
+export type OfflineRevocationEntry = {
+  readonly revocationId: string;
+  readonly queuedAt: number;
+  readonly reason: string;
+};
 
 export const createFeedEntry = (postCID: string, timestamp = Date.now()): FeedEntry => {
   if (postCID.trim().length === 0) {
@@ -374,4 +393,194 @@ export const formatDidHandle = (did: string): string => {
     return did;
   }
   return `${did.slice(0, 18)}...${did.slice(-6)}`;
+};
+
+const normalizeCapability = (capability: UcanCapability): UcanCapability => {
+  const withValue = capability.with.trim();
+  const canValue = capability.can.trim();
+  if (withValue.length === 0 || canValue.length === 0) {
+    throw new Error("UCAN capability fields must be non-empty");
+  }
+  return {
+    with: withValue,
+    can: canValue
+  };
+};
+
+export const createRevocationId = (timestamp = Date.now()): string => {
+  const entropy = encodeBase58(randomBytes(12));
+  return `revoke-${timestamp.toString(36)}-${entropy}`;
+};
+
+export const createUcanDelegation = (params: {
+  issuerDid: string;
+  audienceDid: string;
+  capabilities: readonly UcanCapability[];
+  ttlSeconds?: number;
+  issuedAt?: number;
+  revocationId?: string;
+}): UcanDelegationRecord => {
+  if (!isValidDidKey(params.issuerDid) || !isValidDidKey(params.audienceDid)) {
+    throw new Error("UCAN issuer and audience must be valid did:key identifiers");
+  }
+  if (params.capabilities.length === 0) {
+    throw new Error("UCAN delegation requires at least one capability");
+  }
+  const issuedAt = params.issuedAt ?? Date.now();
+  const ttlSeconds = params.ttlSeconds ?? 3600;
+  if (!Number.isFinite(ttlSeconds) || ttlSeconds < 60 || ttlSeconds > 31_536_000) {
+    throw new Error("UCAN ttlSeconds must be between 60 and 31536000");
+  }
+  const capabilities = params.capabilities.map((capability) => normalizeCapability(capability));
+  const revocationId = (params.revocationId ?? createRevocationId(issuedAt)).trim();
+  if (revocationId.length === 0) {
+    throw new Error("UCAN revocationId must be non-empty");
+  }
+  return {
+    issuerDid: params.issuerDid,
+    audienceDid: params.audienceDid,
+    capabilities,
+    issuedAt,
+    expiresAt: issuedAt + Math.floor(ttlSeconds * 1000),
+    revocationId,
+    nonce: encodeBase58(randomBytes(8)),
+    version: "1.1"
+  };
+};
+
+export const isUcanDelegationExpired = (
+  delegation: Pick<UcanDelegationRecord, "expiresAt">,
+  now = Date.now()
+): boolean => {
+  return now >= delegation.expiresAt;
+};
+
+export const serializeUcanDelegation = (delegation: UcanDelegationRecord): string => {
+  return JSON.stringify(delegation);
+};
+
+export const parseUcanDelegation = (raw: string | null | undefined): UcanDelegationRecord | null => {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isObject(parsed)) {
+    return null;
+  }
+  const issuerDid = typeof parsed.issuerDid === "string" ? parsed.issuerDid : "";
+  const audienceDid = typeof parsed.audienceDid === "string" ? parsed.audienceDid : "";
+  if (!isValidDidKey(issuerDid) || !isValidDidKey(audienceDid)) {
+    return null;
+  }
+  if (!Array.isArray(parsed.capabilities)) {
+    return null;
+  }
+  const capabilities: UcanCapability[] = [];
+  for (const capability of parsed.capabilities) {
+    if (!isObject(capability)) {
+      return null;
+    }
+    const withValue = typeof capability.with === "string" ? capability.with.trim() : "";
+    const canValue = typeof capability.can === "string" ? capability.can.trim() : "";
+    if (withValue.length === 0 || canValue.length === 0) {
+      return null;
+    }
+    capabilities.push({ with: withValue, can: canValue });
+  }
+  if (capabilities.length === 0) {
+    return null;
+  }
+  const issuedAt = typeof parsed.issuedAt === "number" ? parsed.issuedAt : NaN;
+  const expiresAt = typeof parsed.expiresAt === "number" ? parsed.expiresAt : NaN;
+  const revocationId = typeof parsed.revocationId === "string" ? parsed.revocationId.trim() : "";
+  const nonce = typeof parsed.nonce === "string" ? parsed.nonce.trim() : "";
+  const version = parsed.version;
+  if (
+    !Number.isFinite(issuedAt) ||
+    !Number.isFinite(expiresAt) ||
+    expiresAt <= issuedAt ||
+    revocationId.length === 0 ||
+    nonce.length === 0 ||
+    version !== "1.1"
+  ) {
+    return null;
+  }
+  return {
+    issuerDid,
+    audienceDid,
+    capabilities,
+    issuedAt,
+    expiresAt,
+    revocationId,
+    nonce,
+    version: "1.1"
+  };
+};
+
+export const createOfflineRevocationEntry = (
+  revocationId: string,
+  reason: string,
+  queuedAt = Date.now()
+): OfflineRevocationEntry => {
+  const normalizedRevocationId = revocationId.trim();
+  const normalizedReason = reason.trim();
+  if (normalizedRevocationId.length === 0) {
+    throw new Error("revocationId must be non-empty");
+  }
+  if (normalizedReason.length === 0) {
+    throw new Error("reason must be non-empty");
+  }
+  return {
+    revocationId: normalizedRevocationId,
+    queuedAt,
+    reason: normalizedReason
+  };
+};
+
+export const enqueueOfflineRevocation = (
+  queue: readonly OfflineRevocationEntry[],
+  entry: OfflineRevocationEntry
+): OfflineRevocationEntry[] => {
+  if (queue.some((queued) => queued.revocationId === entry.revocationId)) {
+    return [...queue];
+  }
+  return [...queue, entry];
+};
+
+export const serializeOfflineRevocationQueue = (queue: readonly OfflineRevocationEntry[]): string => {
+  return JSON.stringify(queue);
+};
+
+export const parseOfflineRevocationQueue = (raw: string | null | undefined): OfflineRevocationEntry[] => {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  const queue: OfflineRevocationEntry[] = [];
+  for (const item of parsed) {
+    if (!isObject(item)) {
+      continue;
+    }
+    const revocationId = typeof item.revocationId === "string" ? item.revocationId.trim() : "";
+    const reason = typeof item.reason === "string" ? item.reason.trim() : "";
+    const queuedAt = typeof item.queuedAt === "number" ? item.queuedAt : NaN;
+    if (revocationId.length === 0 || reason.length === 0 || !Number.isFinite(queuedAt)) {
+      continue;
+    }
+    queue.push({ revocationId, reason, queuedAt });
+  }
+  return queue;
 };

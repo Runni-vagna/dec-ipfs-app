@@ -26,3 +26,9 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Input validation on CID/DID/UCAN values before processing
 - Private swarm secrets are local-only and never transmitted by default
 - Offline revocation queue persisted and replayed on reconnect
+
+## UCAN Scaffold Status (Phase 1)
+
+- Core library now enforces delegation TTL bounds and requires non-empty revocation IDs.
+- Delegation payload parser rejects malformed DID/capability/version/expiry fields.
+- Offline revocation queue primitives exist for local persistence + replay on reconnect.

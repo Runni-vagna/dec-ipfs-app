@@ -7,22 +7,31 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  createOfflineRevocationEntry,
+  createRevocationId,
+  createUcanDelegation,
   createIdentityRecord,
   createFeedStateSnapshot,
   createResetFeedState,
   createDraftPost,
   createFeedEntry,
   createLocalCID,
+  enqueueOfflineRevocation,
   filterFeedPosts,
   formatDidHandle,
+  isUcanDelegationExpired,
   isValidDidKey,
+  parseOfflineRevocationQueue,
   parseIdentityRecord,
   parseActiveTab,
+  parseUcanDelegation,
   parseImportedFeedState,
   prependFeedPost,
   removeFeedPost,
   restoreFeedPost,
+  serializeOfflineRevocationQueue,
   serializeIdentityRecord,
+  serializeUcanDelegation,
   serializeFeedStateSnapshot,
   toFeedPost,
   toggleFlag
@@ -195,5 +204,67 @@ describe("identity helpers", () => {
     expect(parseIdentityRecord("not-json")).toBeNull();
     const formatted = formatDidHandle("did:key:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");
     expect(formatted.includes("...")).toBe(true);
+  });
+});
+
+describe("ucan and revocation helpers", () => {
+  const issuer = createIdentityRecord(1700000000000).did;
+  const audience = createIdentityRecord(1700000000100).did;
+
+  it("creates delegation with expiry and revocation id", () => {
+    const delegation = createUcanDelegation({
+      issuerDid: issuer,
+      audienceDid: audience,
+      capabilities: [{ with: issuer, can: "feed/publish" }],
+      issuedAt: 1700000000000,
+      ttlSeconds: 120
+    });
+    expect(delegation.version).toBe("1.1");
+    expect(delegation.expiresAt).toBe(1700000120000);
+    expect(delegation.revocationId.startsWith("revoke-")).toBe(true);
+    expect(isUcanDelegationExpired(delegation, 1700000119000)).toBe(false);
+    expect(isUcanDelegationExpired(delegation, 1700000120000)).toBe(true);
+  });
+
+  it("serializes and parses delegation", () => {
+    const delegation = createUcanDelegation({
+      issuerDid: issuer,
+      audienceDid: audience,
+      capabilities: [{ with: issuer, can: "feed/read" }],
+      issuedAt: 1700000000000,
+      ttlSeconds: 300,
+      revocationId: createRevocationId(1700000000000)
+    });
+    const raw = serializeUcanDelegation(delegation);
+    const parsed = parseUcanDelegation(raw);
+    expect(parsed?.issuerDid).toBe(issuer);
+    expect(parsed?.audienceDid).toBe(audience);
+    expect(parsed?.capabilities[0]?.can).toBe("feed/read");
+  });
+
+  it("rejects invalid delegation payloads", () => {
+    expect(
+      () =>
+        createUcanDelegation({
+          issuerDid: "did:key:invalid",
+          audienceDid: audience,
+          capabilities: [{ with: "x", can: "feed/read" }]
+        })
+    ).toThrow("UCAN issuer and audience must be valid did:key identifiers");
+    expect(parseUcanDelegation("{\"issuerDid\":\"bad\"}")).toBeNull();
+    expect(parseUcanDelegation("not-json")).toBeNull();
+  });
+
+  it("handles offline revocation queue", () => {
+    const entry = createOfflineRevocationEntry(" revoke-1 ", " key compromise ", 1700000005000);
+    const queue = enqueueOfflineRevocation([], entry);
+    const deduped = enqueueOfflineRevocation(queue, entry);
+    expect(queue).toHaveLength(1);
+    expect(deduped).toHaveLength(1);
+    const raw = serializeOfflineRevocationQueue(queue);
+    const parsed = parseOfflineRevocationQueue(raw);
+    expect(parsed[0]?.revocationId).toBe("revoke-1");
+    expect(parsed[0]?.reason).toBe("key compromise");
+    expect(parseOfflineRevocationQueue("bad-json")).toHaveLength(0);
   });
 });

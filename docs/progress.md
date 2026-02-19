@@ -56,6 +56,11 @@
   - implemented DID-key identity utilities in `packages/core/src/index.ts` (create/validate/serialize/parse/format)
   - wired profile UI identity actions in `packages/ui/src/App.tsx` (`Create DID`, `Clear DID`) with local persistence
   - expanded core tests for identity helpers and UI tests for profile DID creation flow
+- Added Phase 1 UCAN + revocation scaffolding in core:
+  - implemented UCAN delegation model with bounded TTL, expiry checks, revocation ID generation, and strict parse/serialize helpers in `packages/core/src/index.ts`
+  - added offline revocation queue primitives (enqueue + parse/serialize) for reconnect replay flows
+  - expanded core tests to cover delegation creation/parsing, expiry behavior, invalid payload handling, and revocation queue behavior (`19` core tests passing)
+  - documented security impact in `docs/threat-model.md` under UCAN scaffold status
 
 ### Phase Tracking
 
