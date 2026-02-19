@@ -187,6 +187,10 @@
   - profile now includes `Storage Risk` panel with budget usage, risk level, pin ops, and last update
   - added profile actions to simulate pin spend and reset storage telemetry
   - expanded UI tests to validate high storage risk warning rendering
+- Simplified security UX for non-expert users:
+  - operator-heavy controls are now behind `Advanced Security` toggle (collapsed by default)
+  - core DID/UCAN actions and protection mechanisms remain active by default
+  - updated UI tests for advanced-control visibility changes
 
 ### Phase Tracking
 

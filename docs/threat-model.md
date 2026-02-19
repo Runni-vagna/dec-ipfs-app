@@ -49,3 +49,4 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Emergency override can now be cancelled instantly from profile to restore strict replay safety.
 - Profile now surfaces a compact replay safety state summary to reduce operator ambiguity before replay actions.
 - Storage telemetry panel now surfaces budget saturation risk (`high`/`critical`) to reduce pinning cost overrun risk.
+- Advanced security controls are now collapsed by default to reduce operator mistakes while preserving secure defaults.

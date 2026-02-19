@@ -236,6 +236,7 @@ export const App = () => {
     }
     return raw === "true";
   });
+  const [showAdvancedSecurity, setShowAdvancedSecurity] = useState(false);
   const [unsafeReplayOverrideUntil, setUnsafeReplayOverrideUntil] = useState<number | null>(() => {
     if (typeof window === "undefined") {
       return null;
@@ -1092,6 +1093,14 @@ export const App = () => {
             <>
               <h2>Profile Tools</h2>
               <p className="muted">Quick maintenance actions for your local demo state.</p>
+              <div className="profile-actions">
+                <button
+                  className={showAdvancedSecurity ? "follow following" : "follow secondary"}
+                  onClick={() => setShowAdvancedSecurity((current) => !current)}
+                >
+                  Advanced Security: {showAdvancedSecurity ? "Shown" : "Hidden"}
+                </button>
+              </div>
               <div className="alert-row">
                 <span>{identity ? formatDidHandle(identity.did) : "No DID identity created"}</span>
                 <span className="muted">{identity ? "Active DID" : "Create Identity"}</span>
@@ -1142,26 +1151,28 @@ export const App = () => {
                     <span>Last update: {new Date(storageTelemetry.lastUpdated).toLocaleString()}</span>
                   </div>
                 </div>
-                <div className="profile-actions">
-                  <button
-                    className="follow secondary"
-                    onClick={() => {
-                      setStorageTelemetry((current) => recordPinCost(current, 0.25));
-                      setActionNote("Simulated pin spend: +$0.25.");
-                    }}
-                  >
-                    Simulate Pin Spend ($0.25)
-                  </button>
-                  <button
-                    className="follow secondary"
-                    onClick={() => {
-                      setStorageTelemetry(createStorageTelemetry(storageTelemetry.budgetUsd));
-                      setActionNote("Storage telemetry reset.");
-                    }}
-                  >
-                    Reset Storage Budget
-                  </button>
-                </div>
+                {showAdvancedSecurity && (
+                  <div className="profile-actions">
+                    <button
+                      className="follow secondary"
+                      onClick={() => {
+                        setStorageTelemetry((current) => recordPinCost(current, 0.25));
+                        setActionNote("Simulated pin spend: +$0.25.");
+                      }}
+                    >
+                      Simulate Pin Spend ($0.25)
+                    </button>
+                    <button
+                      className="follow secondary"
+                      onClick={() => {
+                        setStorageTelemetry(createStorageTelemetry(storageTelemetry.budgetUsd));
+                        setActionNote("Storage telemetry reset.");
+                      }}
+                    >
+                      Reset Storage Budget
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="alerts-panel">
                 <h3>Escalation</h3>
@@ -1402,55 +1413,6 @@ export const App = () => {
                 </div>
                 <button
                   className="follow secondary"
-                  onClick={() => {
-                    setSafeReplayOnly((current) => !current);
-                    setUnsafeReplayConfirmArmed(false);
-                    setActionNote(`Safe replay only ${!safeReplayOnly ? "enabled" : "disabled"}.`);
-                  }}
-                >
-                  Safe Replay Only: {safeReplayOnly ? "On" : "Off"}
-                </button>
-                <button
-                  className="follow secondary"
-                  disabled={unsafeReplayOverrideActive}
-                  onClick={() => {
-                    const overrideUntil = Date.now() + 5 * 60 * 1000;
-                    setUnsafeReplayOverrideUntil(overrideUntil);
-                    setUnsafeReplayConfirmArmed(false);
-                    recordSecurityEvent(
-                      "revocation.verified",
-                      `temporary unsafe replay override granted until ${new Date(overrideUntil).toISOString()}`
-                    );
-                    setActionNote("Temporary unsafe replay override enabled for 5 minutes.");
-                  }}
-                >
-                  {unsafeReplayOverrideActive
-                    ? `Unsafe Replay Override Active (${unsafeReplayOverrideRemaining ?? "00:00"})`
-                    : "Temporarily Allow Unsafe Replay (5m)"}
-                </button>
-                {unsafeReplayOverrideActive && (
-                  <>
-                    <div className="alert-row">
-                      <span>
-                        Unsafe replay override active until {new Date(unsafeReplayOverrideUntil ?? 0).toLocaleTimeString()} (remaining {unsafeReplayOverrideRemaining ?? "00:00"}).
-                      </span>
-                    </div>
-                    <div className="alert-row">
-                      <button
-                        className="follow secondary"
-                        onClick={() => {
-                          setUnsafeReplayOverrideUntil(null);
-                          recordSecurityEvent("revocation.verified", "temporary unsafe replay override cancelled");
-                          setActionNote("Temporary unsafe replay override cancelled.");
-                        }}
-                      >
-                        Cancel Unsafe Override
-                      </button>
-                    </div>
-                  </>
-                )}
-                <button
-                  className="follow secondary"
                   onClick={() => void (async () => {
                     if (revocationList.entries.length > 0 && revocationListPolicyStatus !== "valid") {
                       if (safeReplayOnly && !unsafeReplayOverrideActive) {
@@ -1517,70 +1479,6 @@ export const App = () => {
                   })()}
                 >
                   Replay Revocations
-                </button>
-                <button
-                  className="follow secondary"
-                  onClick={() => {
-                    if (!identity) {
-                      setActionNote("Create DID first to sign revocation list.");
-                      return;
-                    }
-                    setRevocationList((current) => signRevocationList(current, identity.did));
-                    recordSecurityEvent("revocation.verified", "revocation list signed");
-                    setActionNote("Revocation list signed.");
-                  }}
-                >
-                  Sign Revocation List
-                </button>
-                <button
-                  className="follow secondary"
-                  onClick={() => {
-                    const verified = verifyRevocationListSignature(revocationList);
-                    recordSecurityEvent(
-                      "revocation.verified",
-                      `revocation list integrity ${verified ? "verified" : "failed"}`
-                    );
-                    setActionNote(`Revocation list integrity ${verified ? "verified" : "failed"}.`);
-                  }}
-                >
-                  Verify Revocation List
-                </button>
-                <button
-                  className="follow secondary"
-                  onClick={() => {
-                    const issuerDid = revocationList.issuerDid;
-                    if (!issuerDid) {
-                      setActionNote("Revocation list has no issuer DID to trust.");
-                      return;
-                    }
-                    setTrustedRevocationIssuers((current) => {
-                      if (current.includes(issuerDid)) {
-                        return current;
-                      }
-                      return [...current, issuerDid];
-                    });
-                    recordSecurityEvent("revocation.verified", `trusted issuer ${issuerDid}`);
-                    setActionNote("Revocation list issuer trusted.");
-                  }}
-                >
-                  Trust Issuer
-                </button>
-                <button
-                  className="follow secondary"
-                  onClick={() => {
-                    const issuerDid = revocationList.issuerDid;
-                    if (!issuerDid) {
-                      setActionNote("Revocation list has no issuer DID to untrust.");
-                      return;
-                    }
-                    setTrustedRevocationIssuers((current) =>
-                      current.filter((did) => did !== issuerDid)
-                    );
-                    recordSecurityEvent("revocation.verified", `removed trusted issuer ${issuerDid}`);
-                    setActionNote("Revocation list issuer removed from trust list.");
-                  }}
-                >
-                  Untrust Issuer
                 </button>
                 <button
                   className="follow secondary"
@@ -1656,6 +1554,123 @@ export const App = () => {
                 >
                   Retry Failed Flushes
                 </button>
+                {showAdvancedSecurity && (
+                  <>
+                    <button
+                      className="follow secondary"
+                      onClick={() => {
+                        setSafeReplayOnly((current) => !current);
+                        setUnsafeReplayConfirmArmed(false);
+                        setActionNote(`Safe replay only ${!safeReplayOnly ? "enabled" : "disabled"}.`);
+                      }}
+                    >
+                      Safe Replay Only: {safeReplayOnly ? "On" : "Off"}
+                    </button>
+                    <button
+                      className="follow secondary"
+                      disabled={unsafeReplayOverrideActive}
+                      onClick={() => {
+                        const overrideUntil = Date.now() + 5 * 60 * 1000;
+                        setUnsafeReplayOverrideUntil(overrideUntil);
+                        setUnsafeReplayConfirmArmed(false);
+                        recordSecurityEvent(
+                          "revocation.verified",
+                          `temporary unsafe replay override granted until ${new Date(overrideUntil).toISOString()}`
+                        );
+                        setActionNote("Temporary unsafe replay override enabled for 5 minutes.");
+                      }}
+                    >
+                      {unsafeReplayOverrideActive
+                        ? `Unsafe Replay Override Active (${unsafeReplayOverrideRemaining ?? "00:00"})`
+                        : "Temporarily Allow Unsafe Replay (5m)"}
+                    </button>
+                    {unsafeReplayOverrideActive && (
+                      <>
+                        <div className="alert-row">
+                          <span>
+                            Unsafe replay override active until {new Date(unsafeReplayOverrideUntil ?? 0).toLocaleTimeString()} (remaining {unsafeReplayOverrideRemaining ?? "00:00"}).
+                          </span>
+                        </div>
+                        <div className="alert-row">
+                          <button
+                            className="follow secondary"
+                            onClick={() => {
+                              setUnsafeReplayOverrideUntil(null);
+                              recordSecurityEvent("revocation.verified", "temporary unsafe replay override cancelled");
+                              setActionNote("Temporary unsafe replay override cancelled.");
+                            }}
+                          >
+                            Cancel Unsafe Override
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    <button
+                      className="follow secondary"
+                      onClick={() => {
+                        if (!identity) {
+                          setActionNote("Create DID first to sign revocation list.");
+                          return;
+                        }
+                        setRevocationList((current) => signRevocationList(current, identity.did));
+                        recordSecurityEvent("revocation.verified", "revocation list signed");
+                        setActionNote("Revocation list signed.");
+                      }}
+                    >
+                      Sign Revocation List
+                    </button>
+                    <button
+                      className="follow secondary"
+                      onClick={() => {
+                        const verified = verifyRevocationListSignature(revocationList);
+                        recordSecurityEvent(
+                          "revocation.verified",
+                          `revocation list integrity ${verified ? "verified" : "failed"}`
+                        );
+                        setActionNote(`Revocation list integrity ${verified ? "verified" : "failed"}.`);
+                      }}
+                    >
+                      Verify Revocation List
+                    </button>
+                    <button
+                      className="follow secondary"
+                      onClick={() => {
+                        const issuerDid = revocationList.issuerDid;
+                        if (!issuerDid) {
+                          setActionNote("Revocation list has no issuer DID to trust.");
+                          return;
+                        }
+                        setTrustedRevocationIssuers((current) => {
+                          if (current.includes(issuerDid)) {
+                            return current;
+                          }
+                          return [...current, issuerDid];
+                        });
+                        recordSecurityEvent("revocation.verified", `trusted issuer ${issuerDid}`);
+                        setActionNote("Revocation list issuer trusted.");
+                      }}
+                    >
+                      Trust Issuer
+                    </button>
+                    <button
+                      className="follow secondary"
+                      onClick={() => {
+                        const issuerDid = revocationList.issuerDid;
+                        if (!issuerDid) {
+                          setActionNote("Revocation list has no issuer DID to untrust.");
+                          return;
+                        }
+                        setTrustedRevocationIssuers((current) =>
+                          current.filter((did) => did !== issuerDid)
+                        );
+                        recordSecurityEvent("revocation.verified", `removed trusted issuer ${issuerDid}`);
+                        setActionNote("Revocation list issuer removed from trust list.");
+                      }}
+                    >
+                      Untrust Issuer
+                    </button>
+                  </>
+                )}
                 <button className="follow secondary" onClick={resetDemoState}>Reset Demo Data</button>
                 <button className="follow secondary" onClick={exportAuditLog}>
                   <Download size={14} />

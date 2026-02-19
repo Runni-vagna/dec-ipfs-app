@@ -30,7 +30,7 @@ describe("App interactions", () => {
   it("defaults safe replay only to on for new sessions", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
-    expect(screen.getByRole("button", { name: "Safe Replay Only: On" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Safe Replay Only: On" })).toBeNull();
     expect(screen.getByText(/Replay safety state: policy=valid/i)).toBeTruthy();
     expect(screen.getByText(/safeOnly=on/i)).toBeTruthy();
   });
@@ -222,7 +222,7 @@ describe("App interactions", () => {
 
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
-    expect(screen.getByRole("button", { name: "Safe Replay Only: On" })).toBeTruthy();
+    expect(screen.getByText(/safeOnly=on/i)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
     expect(screen.getByText(/Replay denied: policy is invalid-signature and Safe Replay Only is enabled\./i)).toBeTruthy();
@@ -250,6 +250,7 @@ describe("App interactions", () => {
 
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Advanced Security: Hidden" }));
     fireEvent.click(screen.getByRole("button", { name: "Temporarily Allow Unsafe Replay (5m)" }));
     expect(screen.getByText("Temporary unsafe replay override enabled for 5 minutes.")).toBeTruthy();
     expect(screen.getByText(/Unsafe replay override active until/i)).toBeTruthy();
@@ -266,6 +267,7 @@ describe("App interactions", () => {
 
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Advanced Security: Hidden" }));
 
     expect(screen.getByRole("button", { name: "Cancel Unsafe Override" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancel Unsafe Override" }));
@@ -366,6 +368,7 @@ describe("App interactions", () => {
 
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Advanced Security: Hidden" }));
     expect(screen.getByText("Revocation list integrity: Unverified")).toBeTruthy();
     expect(screen.getByText("Revocation list policy: invalid-signature")).toBeTruthy();
 
