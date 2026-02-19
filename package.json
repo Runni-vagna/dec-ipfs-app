@@ -8,7 +8,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev --parallel",
+    "dev": "pnpm dev:tauri",
+    "dev:all": "turbo run dev --parallel",
     "dev:ui": "pnpm --filter @cidfeed/ui dev",
     "dev:tauri": "pnpm --filter @cidfeed/tauri dev",
     "build": "turbo run build",
