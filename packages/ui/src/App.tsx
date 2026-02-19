@@ -7,7 +7,17 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Bell, CircleHelp, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
-import { createDraftPost } from "@cidfeed/core";
+import {
+  createDraftPost,
+  filterFeedPosts,
+  prependFeedPost,
+  removeFeedPost,
+  restoreFeedPost,
+  toFeedPost,
+  toggleFlag,
+  type FeedPost,
+  type RemovedPostSnapshot
+} from "@cidfeed/core";
 import {
   getPrivateNodeStatus,
   simulatePeerJoinCommand,
@@ -18,19 +28,11 @@ import {
 
 type Tab = "main" | "discover" | "private" | "alerts" | "profile";
 
-type FeedItem = {
-  cid: string;
-  body: string;
-  tag: Tab | "all";
-  timestamp: number;
-};
+type FeedItem = FeedPost;
 
 type WizardMode = "easy" | "private" | null;
 
-type RemovedSnapshot = {
-  post: FeedItem;
-  index: number;
-};
+type RemovedSnapshot = RemovedPostSnapshot;
 
 const STORAGE_KEYS = {
   tab: "cidfeed.ui.activeTab",
@@ -118,15 +120,7 @@ export const App = () => {
   });
 
   const filteredPosts = useMemo(() => {
-    const tabFiltered = posts.filter((post) => post.tag === activeTab || post.tag === "all");
-    const pinFiltered = pinnedOnly ? tabFiltered.filter((post) => pinnedCids[post.cid] === true) : tabFiltered;
-    const lowered = query.trim().toLowerCase();
-    if (lowered.length === 0) {
-      return pinFiltered;
-    }
-    return pinFiltered.filter(
-      (post) => post.cid.toLowerCase().includes(lowered) || post.body.toLowerCase().includes(lowered)
-    );
+    return filterFeedPosts(posts, activeTab, query, pinnedOnly, pinnedCids);
   }, [activeTab, pinnedOnly, pinnedCids, posts, query]);
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
@@ -142,11 +136,8 @@ export const App = () => {
     if (trimmed.length === 0) {
       return;
     }
-    const post = createDraftPost(trimmed, activeTab);
-    setPosts((current) => [
-      { cid: post.cid, body: post.body, tag: activeTab, timestamp: post.timestamp },
-      ...current
-    ]);
+    const post = toFeedPost(createDraftPost(trimmed, activeTab));
+    setPosts((current) => prependFeedPost(current, post));
     if (activeTab !== "alerts") {
       setUnreadAlerts((count) => count + 1);
     }
@@ -157,17 +148,12 @@ export const App = () => {
 
   const removePost = (target: FeedItem) => {
     setPosts((current) => {
-      const index = current.findIndex((post) => post.cid === target.cid && post.body === target.body);
-      if (index === -1) {
-        return current;
+      const result = removeFeedPost(current, target);
+      if (result.removed) {
+        setLastRemoved(result.removed);
+        setActionNote(`Removed ${result.removed.post.cid}...`);
       }
-      const next = [...current];
-      const [removed] = next.splice(index, 1);
-      if (removed) {
-        setLastRemoved({ post: removed, index });
-        setActionNote(`Removed ${removed.cid}...`);
-      }
-      return next;
+      return result.posts;
     });
   };
 
@@ -175,12 +161,7 @@ export const App = () => {
     if (!lastRemoved) {
       return;
     }
-    setPosts((current) => {
-      const next = [...current];
-      const safeIndex = Math.max(0, Math.min(lastRemoved.index, next.length));
-      next.splice(safeIndex, 0, lastRemoved.post);
-      return next;
-    });
+    setPosts((current) => restoreFeedPost(current, lastRemoved));
     setLastRemoved(null);
     setActionNote("Removal undone.");
   };
@@ -509,10 +490,7 @@ export const App = () => {
                       className={isPinned ? "follow following" : "follow secondary"}
                       onClick={() => {
                         const next = !isPinned;
-                        setPinnedCids((current) => ({
-                          ...current,
-                          [post.cid]: next
-                        }));
+                        setPinnedCids((current) => toggleFlag(current, post.cid));
                         setActionNote(next ? `Pinned ${post.cid}.` : `Unpinned ${post.cid}.`);
                       }}
                     >
@@ -522,10 +500,7 @@ export const App = () => {
                       className={isFollowed ? "follow following" : "follow"}
                       onClick={() => {
                         const next = !isFollowed;
-                        setFollowedCids((current) => ({
-                          ...current,
-                          [post.cid]: next
-                        }));
+                        setFollowedCids((current) => toggleFlag(current, post.cid));
                         setActionNote(next ? `Following ${post.cid}...` : `Unfollowed ${post.cid}.`);
                       }}
                     >

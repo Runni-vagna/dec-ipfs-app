@@ -51,6 +51,18 @@ export type DraftPost = {
   readonly entry: FeedEntry;
 };
 
+export type FeedPost = {
+  readonly cid: string;
+  readonly body: string;
+  readonly tag: FeedTab;
+  readonly timestamp: number;
+};
+
+export type RemovedPostSnapshot = {
+  readonly post: FeedPost;
+  readonly index: number;
+};
+
 export const createDraftPost = (body: string, tag: FeedTab, timestamp = Date.now()): DraftPost => {
   const normalizedBody = body.trim();
   const cid = createLocalCID(normalizedBody, timestamp);
@@ -62,4 +74,78 @@ export const createDraftPost = (body: string, tag: FeedTab, timestamp = Date.now
     timestamp,
     entry
   };
+};
+
+export const toFeedPost = (draftPost: DraftPost): FeedPost => {
+  return {
+    cid: draftPost.cid,
+    body: draftPost.body,
+    tag: draftPost.tag,
+    timestamp: draftPost.timestamp
+  };
+};
+
+export const prependFeedPost = (posts: readonly FeedPost[], post: FeedPost): FeedPost[] => {
+  return [post, ...posts];
+};
+
+export const removeFeedPost = (posts: readonly FeedPost[], target: FeedPost): {
+  posts: FeedPost[];
+  removed: RemovedPostSnapshot | null;
+} => {
+  const index = posts.findIndex((post) => post.cid === target.cid && post.body === target.body);
+  if (index === -1) {
+    return {
+      posts: [...posts],
+      removed: null
+    };
+  }
+  const next = [...posts];
+  const [removedPost] = next.splice(index, 1);
+  if (!removedPost) {
+    return {
+      posts: next,
+      removed: null
+    };
+  }
+  return {
+    posts: next,
+    removed: {
+      post: removedPost,
+      index
+    }
+  };
+};
+
+export const restoreFeedPost = (posts: readonly FeedPost[], snapshot: RemovedPostSnapshot): FeedPost[] => {
+  const next = [...posts];
+  const safeIndex = Math.max(0, Math.min(snapshot.index, next.length));
+  next.splice(safeIndex, 0, snapshot.post);
+  return next;
+};
+
+export const toggleFlag = (flags: Readonly<Record<string, boolean>>, key: string): Record<string, boolean> => {
+  const next = !(flags[key] === true);
+  return {
+    ...flags,
+    [key]: next
+  };
+};
+
+export const filterFeedPosts = (
+  posts: readonly FeedPost[],
+  activeTab: FeedTab,
+  query: string,
+  pinnedOnly: boolean,
+  pinnedCids: Readonly<Record<string, boolean>>
+): FeedPost[] => {
+  const tabFiltered = posts.filter((post) => post.tag === activeTab || post.tag === "all");
+  const pinFiltered = pinnedOnly ? tabFiltered.filter((post) => pinnedCids[post.cid] === true) : tabFiltered;
+  const lowered = query.trim().toLowerCase();
+  if (lowered.length === 0) {
+    return pinFiltered;
+  }
+  return pinFiltered.filter(
+    (post) => post.cid.toLowerCase().includes(lowered) || post.body.toLowerCase().includes(lowered)
+  );
 };

@@ -35,6 +35,10 @@
   - implemented Tauri command handlers + shared in-memory state in `packages/tauri/src-tauri/src/main.rs`
   - pinned UI dependency: `@tauri-apps/api` for command invocation
 - Runtime caveat (local environment): Tauri Rust build/check still requires Linux WebKitGTK/JSC system packages (`webkit2gtk-4.1`, `javascriptcoregtk-4.1`) before full native compile can pass.
+- Consolidated feed interaction logic into shared core domain helpers:
+  - added reusable operations in `packages/core/src/index.ts` for post conversion, prepend, filter, remove/restore, and boolean flag toggles
+  - updated UI feed actions in `packages/ui/src/App.tsx` to call core helpers for publish/filter/pin/follow/remove/undo
+  - expanded core tests to cover these flows (`9` tests passing in core suite)
 
 ### Phase Tracking
 
