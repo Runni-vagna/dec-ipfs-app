@@ -135,6 +135,10 @@ button {
   gap: 0.5rem;
 }
 
+.search-wrap {
+  position: relative;
+}
+
 .search-input {
   border: 1px solid var(--border);
   background: #0a0e147a;
@@ -143,6 +147,20 @@ button {
   height: 34px;
   padding: 0 0.6rem;
   width: 210px;
+}
+
+.clear-search {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0a0e14b8;
+  display: grid;
+  place-items: center;
 }
 
 .feed-header h1 {
@@ -177,6 +195,11 @@ button {
   transition: box-shadow 160ms ease, transform 160ms ease;
 }
 
+.card-actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
 .feed-card:hover {
   transform: translateY(-1px);
   box-shadow: 0 0 20px #00f5d43d;
@@ -204,6 +227,11 @@ button {
   cursor: pointer;
 }
 
+.cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .follow.following {
   background: #0c2c28;
   color: #8eeede;
@@ -214,6 +242,34 @@ button {
   background: #0a0e1470;
   color: var(--text);
   border: 1px solid var(--border);
+}
+
+.alerts-panel {
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.9rem;
+}
+
+.alerts-panel h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.alerts-list {
+  margin-top: 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.alert-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.4rem 0.55rem;
+  display: flex;
+  justify-content: space-between;
+  background: #0a0e1469;
+  font-size: 0.82rem;
 }
 
 .right-rail h2 {
@@ -349,6 +405,13 @@ button {
   padding: 0.7rem;
   margin-bottom: 0.75rem;
   resize: vertical;
+}
+
+.compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
 }
 
 @media (max-width: 1024px) {

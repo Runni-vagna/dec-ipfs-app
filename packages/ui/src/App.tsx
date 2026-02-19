@@ -20,7 +20,8 @@ const STORAGE_KEYS = {
   tab: "cidfeed.ui.activeTab",
   posts: "cidfeed.ui.posts",
   follows: "cidfeed.ui.follows",
-  unread: "cidfeed.ui.unreadAlerts"
+  unread: "cidfeed.ui.unreadAlerts",
+  pins: "cidfeed.ui.pinnedCids"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -53,6 +54,17 @@ export const App = () => {
     }
     try {
       const raw = window.localStorage.getItem(STORAGE_KEYS.follows);
+      return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [pinnedCids, setPinnedCids] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") {
+      return {};
+    }
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEYS.pins);
       return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
     } catch {
       return {};
@@ -139,6 +151,10 @@ export const App = () => {
   }, [followedCids]);
 
   useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.pins, JSON.stringify(pinnedCids));
+  }, [pinnedCids]);
+
+  useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.unread, String(unreadAlerts));
   }, [unreadAlerts]);
 
@@ -178,6 +194,7 @@ export const App = () => {
     setSearchOpen(false);
     setQuery("");
     setFollowedCids({});
+    setPinnedCids({});
     setWizardOpen(false);
     setComposeOpen(false);
     setDraft("");
@@ -187,6 +204,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.posts);
     window.localStorage.removeItem(STORAGE_KEYS.follows);
     window.localStorage.removeItem(STORAGE_KEYS.unread);
+    window.localStorage.removeItem(STORAGE_KEYS.pins);
     setActionNote("Demo state reset.");
   };
 
@@ -231,14 +249,28 @@ export const App = () => {
                 <Plus size={16} />
               </button>
               {isSearchOpen && (
-                <input
-                  ref={searchInputRef}
-                  className="search-input"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search CID or content"
-                  aria-label="Search posts"
-                />
+                <div className="search-wrap">
+                  <input
+                    ref={searchInputRef}
+                    className="search-input"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search CID or content"
+                    aria-label="Search posts"
+                  />
+                  {query.length > 0 && (
+                    <button
+                      className="clear-search"
+                      aria-label="Clear search"
+                      onClick={() => {
+                        setQuery("");
+                        setActionNote("Search cleared.");
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
               )}
               <button
                 className="icon-btn"
@@ -264,25 +296,41 @@ export const App = () => {
             {filteredPosts.map((post) => {
               const key = `${post.cid}-${post.body}`;
               const isFollowed = followedCids[post.cid] === true;
+              const isPinned = pinnedCids[post.cid] === true;
               return (
                 <article className="feed-card" key={key} role="listitem">
                   <div>
                     <p className="cid">{post.cid}... {post.body}</p>
                     <p className="muted">Immutable CID · live OrbitDB update</p>
                   </div>
-                  <button
-                    className={isFollowed ? "follow following" : "follow"}
-                    onClick={() => {
-                      const next = !isFollowed;
-                      setFollowedCids((current) => ({
-                        ...current,
-                        [post.cid]: next
-                      }));
-                      setActionNote(next ? `Following ${post.cid}...` : `Unfollowed ${post.cid}.`);
-                    }}
-                  >
-                    {isFollowed ? "Following" : "Follow"}
-                  </button>
+                  <div className="card-actions">
+                    <button
+                      className={isPinned ? "follow following" : "follow secondary"}
+                      onClick={() => {
+                        const next = !isPinned;
+                        setPinnedCids((current) => ({
+                          ...current,
+                          [post.cid]: next
+                        }));
+                        setActionNote(next ? `Pinned ${post.cid}.` : `Unpinned ${post.cid}.`);
+                      }}
+                    >
+                      {isPinned ? "Pinned" : "Pin"}
+                    </button>
+                    <button
+                      className={isFollowed ? "follow following" : "follow"}
+                      onClick={() => {
+                        const next = !isFollowed;
+                        setFollowedCids((current) => ({
+                          ...current,
+                          [post.cid]: next
+                        }));
+                        setActionNote(next ? `Following ${post.cid}...` : `Unfollowed ${post.cid}.`);
+                      }}
+                    >
+                      {isFollowed ? "Following" : "Follow"}
+                    </button>
+                  </div>
                 </article>
               );
             })}
@@ -317,6 +365,28 @@ export const App = () => {
               <p className="muted">Quick maintenance actions for your local demo state.</p>
               <button className="follow secondary" onClick={resetDemoState}>Reset Demo Data</button>
             </>
+          )}
+          {activeTab === "alerts" && (
+            <div className="alerts-panel">
+              <h3>Alert Center</h3>
+              <button
+                className="follow secondary"
+                onClick={() => {
+                  setUnreadAlerts(0);
+                  setActionNote("All alerts marked as read.");
+                }}
+              >
+                Mark All Read
+              </button>
+              <div className="alerts-list">
+                {posts.filter((post) => post.tag === "alerts").slice(0, 4).map((post) => (
+                  <div className="alert-row" key={`${post.cid}-alert`}>
+                    <span>{post.cid}...</span>
+                    <span className="muted">new</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </aside>
       </main>
@@ -434,9 +504,20 @@ export const App = () => {
               className="compose-textarea"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  publishDraft();
+                }
+              }}
               placeholder="Write immutable CID content..."
             />
-            <button className="cta" onClick={publishDraft}>Publish Mock Post</button>
+            <div className="compose-footer">
+              <span className="muted">Ctrl/Cmd + Enter to publish</span>
+              <button className="cta" onClick={publishDraft} disabled={draft.trim().length === 0}>
+                Publish Mock Post
+              </button>
+            </div>
           </div>
         </div>
       )}
