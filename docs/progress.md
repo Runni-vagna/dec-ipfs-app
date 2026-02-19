@@ -169,6 +169,11 @@
   - profile now includes `Temporarily Allow Unsafe Replay (5m)` action for controlled emergency bypass of Safe Replay deny
   - override expiry is persisted (`cidfeed.ui.unsafeReplayOverrideUntil`) and auto-clears after timeout
   - expanded UI tests to verify replay succeeds during active override window
+- Added override countdown and active lock UX:
+  - override action now shows active countdown label (`MM:SS`) while override is running
+  - override button is disabled during active window to prevent accidental re-arming
+  - profile warning line now includes override remaining countdown
+  - expanded UI tests to assert active override button is disabled
 
 ### Phase Tracking
 

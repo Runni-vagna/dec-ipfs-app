@@ -45,3 +45,4 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Optional `Safe Replay Only` mode now enforces strict deny-by-default behavior for unsafe replay attempts.
 - `Safe Replay Only` now defaults to enabled for new sessions to minimize accidental unsafe replay.
 - Temporary unsafe replay override (5-minute TTL) exists for emergency recovery, with audit logging and automatic expiry.
+- Override UX now includes countdown + disabled re-arm to reduce operator error during emergency bypass windows.

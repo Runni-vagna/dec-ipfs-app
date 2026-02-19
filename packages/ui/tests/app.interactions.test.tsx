@@ -233,6 +233,8 @@ describe("App interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Temporarily Allow Unsafe Replay (5m)" }));
     expect(screen.getByText("Temporary unsafe replay override enabled for 5 minutes.")).toBeTruthy();
     expect(screen.getByText(/Unsafe replay override active until/i)).toBeTruthy();
+    const overrideButton = screen.getByRole("button", { name: /Unsafe Replay Override Active/i });
+    expect(overrideButton).toHaveProperty("disabled", true);
 
     fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
     expect(await screen.findByText(/Replayed 1 queued revocation\(s\)\./i)).toBeTruthy();

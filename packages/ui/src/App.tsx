@@ -200,6 +200,7 @@ export const App = () => {
   const [selectedAuditEntry, setSelectedAuditEntry] = useState<SecurityAuditEntry | null>(null);
   const [securityHydrated, setSecurityHydrated] = useState(false);
   const [timeTick, setTimeTick] = useState(() => Date.now());
+  const [overrideTick, setOverrideTick] = useState(() => Date.now());
   const [retryHighStreak, setRetryHighStreak] = useState<number>(() => {
     if (typeof window === "undefined") {
       return 0;
@@ -361,9 +362,21 @@ export const App = () => {
     [retryEscalationActive, retryEscalationAcknowledgedAt]
   );
   const unsafeReplayOverrideActive = useMemo(
-    () => unsafeReplayOverrideUntil !== null && unsafeReplayOverrideUntil > timeTick,
-    [timeTick, unsafeReplayOverrideUntil]
+    () => unsafeReplayOverrideUntil !== null && unsafeReplayOverrideUntil > overrideTick,
+    [overrideTick, unsafeReplayOverrideUntil]
   );
+  const unsafeReplayOverrideRemaining = useMemo(() => {
+    if (!unsafeReplayOverrideUntil) {
+      return null;
+    }
+    const remainingMs = Math.max(0, unsafeReplayOverrideUntil - overrideTick);
+    const totalSeconds = Math.ceil(remainingMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const mm = String(minutes).padStart(2, "0");
+    const ss = String(seconds).padStart(2, "0");
+    return `${mm}:${ss}`;
+  }, [overrideTick, unsafeReplayOverrideUntil]);
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -589,6 +602,11 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
+    const timer = window.setInterval(() => setOverrideTick(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     if ((revocationListPolicyStatus === "valid" || safeReplayOnly) && unsafeReplayConfirmArmed) {
       setUnsafeReplayConfirmArmed(false);
     }
@@ -616,10 +634,10 @@ export const App = () => {
     if (!unsafeReplayOverrideUntil) {
       return;
     }
-    if (unsafeReplayOverrideUntil <= timeTick) {
+    if (unsafeReplayOverrideUntil <= overrideTick) {
       setUnsafeReplayOverrideUntil(null);
     }
-  }, [timeTick, unsafeReplayOverrideUntil]);
+  }, [overrideTick, unsafeReplayOverrideUntil]);
 
   useEffect(() => {
     if (!securityHydrated) {
@@ -1320,6 +1338,7 @@ export const App = () => {
                 </button>
                 <button
                   className="follow secondary"
+                  disabled={unsafeReplayOverrideActive}
                   onClick={() => {
                     const overrideUntil = Date.now() + 5 * 60 * 1000;
                     setUnsafeReplayOverrideUntil(overrideUntil);
@@ -1331,12 +1350,14 @@ export const App = () => {
                     setActionNote("Temporary unsafe replay override enabled for 5 minutes.");
                   }}
                 >
-                  Temporarily Allow Unsafe Replay (5m)
+                  {unsafeReplayOverrideActive
+                    ? `Unsafe Replay Override Active (${unsafeReplayOverrideRemaining ?? "00:00"})`
+                    : "Temporarily Allow Unsafe Replay (5m)"}
                 </button>
                 {unsafeReplayOverrideActive && (
                   <div className="alert-row">
                     <span>
-                      Unsafe replay override active until {new Date(unsafeReplayOverrideUntil ?? 0).toLocaleTimeString()}.
+                      Unsafe replay override active until {new Date(unsafeReplayOverrideUntil ?? 0).toLocaleTimeString()} (remaining {unsafeReplayOverrideRemaining ?? "00:00"}).
                     </span>
                   </div>
                 )}
