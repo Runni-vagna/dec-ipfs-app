@@ -44,6 +44,10 @@
   - added strict JSON import parser with fallback behavior for invalid or empty post payloads
   - updated `packages/ui/src/App.tsx` profile tools to call shared core state helpers instead of direct UI JSON handling
   - expanded core tests for snapshot serialization and import/reset behavior (`12` tests passing in core suite)
+- Added persistent private-node runtime state in Tauri shell:
+  - `packages/tauri/src-tauri/src/main.rs` now loads initial private-node state from app data (`private-node-state.json`)
+  - start/stop/peer-join commands persist updated state to disk after each mutation
+  - app startup restores previous node online/peer count values for UI status sync
 
 ### Phase Tracking
 
