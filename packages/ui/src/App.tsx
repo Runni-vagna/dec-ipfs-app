@@ -102,7 +102,8 @@ const STORAGE_KEYS = {
   auditLog: "cidfeed.ui.securityAuditLog",
   failedFlushQueue: "cidfeed.ui.failedFlushQueue",
   retryHighStreak: "cidfeed.ui.retryHighStreak",
-  retryEscalationAcknowledgedAt: "cidfeed.ui.retryEscalationAcknowledgedAt"
+  retryEscalationAcknowledgedAt: "cidfeed.ui.retryEscalationAcknowledgedAt",
+  safeReplayOnly: "cidfeed.ui.safeReplayOnly"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -215,6 +216,12 @@ export const App = () => {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   });
   const [unsafeReplayConfirmArmed, setUnsafeReplayConfirmArmed] = useState(false);
+  const [safeReplayOnly, setSafeReplayOnly] = useState<boolean>(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return window.localStorage.getItem(STORAGE_KEYS.safeReplayOnly) === "true";
+  });
 
   const recordSecurityEvent = (
     event:
@@ -565,10 +572,10 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
-    if (revocationListPolicyStatus === "valid" && unsafeReplayConfirmArmed) {
+    if ((revocationListPolicyStatus === "valid" || safeReplayOnly) && unsafeReplayConfirmArmed) {
       setUnsafeReplayConfirmArmed(false);
     }
-  }, [revocationListPolicyStatus, unsafeReplayConfirmArmed]);
+  }, [revocationListPolicyStatus, safeReplayOnly, unsafeReplayConfirmArmed]);
 
   useEffect(() => {
     setRetryHighStreak((current) => {
@@ -650,6 +657,11 @@ export const App = () => {
     } else {
       window.localStorage.removeItem(STORAGE_KEYS.retryEscalationAcknowledgedAt);
     }
+    if (safeReplayOnly) {
+      window.localStorage.setItem(STORAGE_KEYS.safeReplayOnly, "true");
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.safeReplayOnly);
+    }
 
     void saveSecurityStateCommand({
       identityJson,
@@ -669,6 +681,7 @@ export const App = () => {
     revocationQueue,
     retryHighStreak,
     retryEscalationAcknowledgedAt,
+    safeReplayOnly,
     securityHydrated,
     trustedRevocationIssuers
   ]);
@@ -765,6 +778,7 @@ export const App = () => {
     setRetryHighStreak(0);
     setRetryEscalationAcknowledgedAt(null);
     setUnsafeReplayConfirmArmed(false);
+    setSafeReplayOnly(false);
     setAuditLog([]);
     setFailedFlushQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
@@ -779,6 +793,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.trustedRevocationIssuers);
     window.localStorage.removeItem(STORAGE_KEYS.retryHighStreak);
     window.localStorage.removeItem(STORAGE_KEYS.retryEscalationAcknowledgedAt);
+    window.localStorage.removeItem(STORAGE_KEYS.safeReplayOnly);
     window.localStorage.removeItem(STORAGE_KEYS.auditLog);
     window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
     setActionNote("Demo state reset.");
@@ -1265,8 +1280,28 @@ export const App = () => {
                 </button>
                 <button
                   className="follow secondary"
+                  onClick={() => {
+                    setSafeReplayOnly((current) => !current);
+                    setUnsafeReplayConfirmArmed(false);
+                    setActionNote(`Safe replay only ${!safeReplayOnly ? "enabled" : "disabled"}.`);
+                  }}
+                >
+                  Safe Replay Only: {safeReplayOnly ? "On" : "Off"}
+                </button>
+                <button
+                  className="follow secondary"
                   onClick={() => void (async () => {
                     if (revocationList.entries.length > 0 && revocationListPolicyStatus !== "valid") {
+                      if (safeReplayOnly) {
+                        recordSecurityEvent(
+                          "revocation.verified",
+                          `unsafe replay denied (${revocationListPolicyStatus}) due to safe replay mode`
+                        );
+                        setActionNote(
+                          `Replay denied: policy is ${revocationListPolicyStatus} and Safe Replay Only is enabled.`
+                        );
+                        return;
+                      }
                       if (!unsafeReplayConfirmArmed) {
                         setUnsafeReplayConfirmArmed(true);
                         recordSecurityEvent(

@@ -157,6 +157,10 @@
   - `Replay Revocations` now requires explicit second-click confirmation when revocation list policy is not `valid`
   - first click logs `revocation.verified` event and shows a blocking safety message with current policy status
   - expanded UI tests for unsafe replay confirmation flow
+- Added `Safe Replay Only` hard gate:
+  - profile now exposes `Safe Replay Only: On/Off` toggle persisted in local storage (`cidfeed.ui.safeReplayOnly`)
+  - when enabled, unsafe replay (`invalid-signature` / `untrusted-issuer`) is denied with no confirmation bypass
+  - expanded UI tests to verify unsafe replay remains blocked while safe replay mode is enabled
 
 ### Phase Tracking
 
