@@ -214,6 +214,7 @@ export const App = () => {
     const parsed = raw ? Number(raw) : NaN;
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   });
+  const [unsafeReplayConfirmArmed, setUnsafeReplayConfirmArmed] = useState(false);
 
   const recordSecurityEvent = (
     event:
@@ -564,6 +565,12 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
+    if (revocationListPolicyStatus === "valid" && unsafeReplayConfirmArmed) {
+      setUnsafeReplayConfirmArmed(false);
+    }
+  }, [revocationListPolicyStatus, unsafeReplayConfirmArmed]);
+
+  useEffect(() => {
     setRetryHighStreak((current) => {
       if (!failedRetryStatus || failedRetryStatus.severity !== "high") {
         return 0;
@@ -757,6 +764,7 @@ export const App = () => {
     setTrustedRevocationIssuers([]);
     setRetryHighStreak(0);
     setRetryEscalationAcknowledgedAt(null);
+    setUnsafeReplayConfirmArmed(false);
     setAuditLog([]);
     setFailedFlushQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
@@ -1258,6 +1266,20 @@ export const App = () => {
                 <button
                   className="follow secondary"
                   onClick={() => void (async () => {
+                    if (revocationList.entries.length > 0 && revocationListPolicyStatus !== "valid") {
+                      if (!unsafeReplayConfirmArmed) {
+                        setUnsafeReplayConfirmArmed(true);
+                        recordSecurityEvent(
+                          "revocation.verified",
+                          `unsafe replay confirmation required (${revocationListPolicyStatus})`
+                        );
+                        setActionNote(
+                          `Replay blocked: policy is ${revocationListPolicyStatus}. Press Replay Revocations again to confirm unsafe replay.`
+                        );
+                        return;
+                      }
+                    }
+                    setUnsafeReplayConfirmArmed(false);
                     const result = replayOfflineRevocations(revocationQueue, 50);
                     if (result.replayed.length === 0) {
                       setActionNote("No queued revocations to replay.");

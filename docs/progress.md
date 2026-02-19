@@ -153,6 +153,10 @@
   - acknowledgement timestamp is persisted (`cidfeed.ui.retryEscalationAcknowledgedAt`) while escalation remains active
   - acknowledgement emits `revocation.verified` audit entry and user-facing status message
   - expanded UI tests for escalation acknowledgement and audit rendering
+- Added unsafe replay confirmation gate:
+  - `Replay Revocations` now requires explicit second-click confirmation when revocation list policy is not `valid`
+  - first click logs `revocation.verified` event and shows a blocking safety message with current policy status
+  - expanded UI tests for unsafe replay confirmation flow
 
 ### Phase Tracking
 

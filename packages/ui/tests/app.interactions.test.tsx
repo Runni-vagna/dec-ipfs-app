@@ -145,6 +145,33 @@ describe("App interactions", () => {
     ).toBeTruthy();
   });
 
+  it("requires confirm before replay when revocation policy is unsafe", async () => {
+    const now = Date.now();
+    window.localStorage.setItem(
+      "cidfeed.ui.offlineRevocationQueue",
+      JSON.stringify([{ revocationId: "revoke-unsafe-1", queuedAt: now - 1000, reason: "manual profile revoke" }])
+    );
+    window.localStorage.setItem(
+      "cidfeed.ui.revocationList",
+      JSON.stringify({
+        version: "1.1",
+        updatedAt: now,
+        issuerDid: "did:key:z123456789ABCDEFGHJKLMN",
+        signature: `sig-${now}`,
+        entries: [{ revocationId: "revoke-unsafe-1", revokedAt: now, reason: "marker" }]
+      })
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
+    expect(screen.getByText(/Replay blocked: policy is invalid-signature/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
+    expect(await screen.findByText(/Replayed 1 queued revocation\(s\)\./i)).toBeTruthy();
+  });
+
   it("shows revoked status when delegation revocation id exists in revocation list", () => {
     const now = Date.now();
     window.localStorage.setItem(
