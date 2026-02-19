@@ -140,6 +140,10 @@
   - profile now includes a `Security Warnings` panel in `packages/ui/src/App.tsx` for invalid revocation signatures, untrusted issuers, failed flush retries, and replay backlog
   - expanded UI tests to cover invalid revocation signature warning path in `packages/ui/tests/app.interactions.test.tsx`
   - updated `risk-register.md` and `docs/risk-register.md` with R6-R8 replay/trust/tamper risks and mitigations
+- Added retry backoff visualization in profile:
+  - profile now includes `Retry Backoff` summary with severity (`low`/`medium`/`high`), next retry window, max retry count, and next retry timestamp
+  - warning messages now include backoff severity and next retry window context
+  - expanded UI tests for ready-now retry backoff rendering
 
 ### Phase Tracking
 

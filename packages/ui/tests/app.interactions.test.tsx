@@ -281,4 +281,27 @@ describe("App interactions", () => {
 
     expect(screen.getByText(/Revocation list signature is invalid/i)).toBeTruthy();
   });
+
+  it("shows retry backoff severity and ready-now window", () => {
+    const now = Date.now();
+    window.localStorage.setItem(
+      "cidfeed.ui.failedFlushQueue",
+      JSON.stringify([
+        {
+          revocationId: "revoke-backoff-1",
+          failedAt: now - 60_000,
+          retryCount: 5,
+          nextRetryAt: now - 1000,
+          lastError: "tauri flush failed"
+        }
+      ])
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+
+    expect(screen.getByText("Retry backoff severity: high")).toBeTruthy();
+    expect(screen.getByText("Next retry window: ready now")).toBeTruthy();
+    expect(screen.getByText("Max retry count: 5")).toBeTruthy();
+  });
 });

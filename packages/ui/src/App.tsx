@@ -276,6 +276,22 @@ export const App = () => {
     () => verifyRevocationListPolicy(revocationList, trustedRevocationIssuers),
     [revocationList, trustedRevocationIssuers]
   );
+  const failedRetryStatus = useMemo(() => {
+    if (failedFlushQueue.length === 0) {
+      return null;
+    }
+    const nextRetryAt = Math.min(...failedFlushQueue.map((entry) => entry.nextRetryAt));
+    const maxRetryCount = Math.max(...failedFlushQueue.map((entry) => entry.retryCount));
+    const waitMs = Math.max(0, nextRetryAt - timeTick);
+    const nextRetryWindow = waitMs === 0 ? "ready now" : `in ~${Math.ceil(waitMs / 60_000)}m`;
+    const severity = maxRetryCount >= 5 ? "high" : maxRetryCount >= 3 ? "medium" : "low";
+    return {
+      nextRetryAt,
+      nextRetryWindow,
+      maxRetryCount,
+      severity
+    };
+  }, [failedFlushQueue, timeTick]);
   const securityWarnings = useMemo(() => {
     const warnings: string[] = [];
     if (revocationList.entries.length > 0 && revocationListPolicyStatus === "invalid-signature") {
@@ -284,14 +300,22 @@ export const App = () => {
     if (revocationList.entries.length > 0 && revocationListPolicyStatus === "untrusted-issuer") {
       warnings.push("Revocation list issuer is not trusted. Verify issuer DID before accepting list.");
     }
-    if (failedFlushQueue.length > 0) {
-      warnings.push(`Failed revocation flush queue has ${failedFlushQueue.length} pending item(s).`);
+    if (failedRetryStatus) {
+      warnings.push(
+        `Failed revocation flush queue has ${failedFlushQueue.length} pending item(s), severity ${failedRetryStatus.severity}, next retry ${failedRetryStatus.nextRetryWindow}.`
+      );
     }
     if (revocationQueue.length > 25) {
       warnings.push(`Offline revocation queue backlog is ${revocationQueue.length}. Replay soon.`);
     }
     return warnings;
-  }, [failedFlushQueue.length, revocationList.entries.length, revocationListPolicyStatus, revocationQueue.length]);
+  }, [
+    failedFlushQueue.length,
+    failedRetryStatus,
+    revocationList.entries.length,
+    revocationListPolicyStatus,
+    revocationQueue.length
+  ]);
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -939,6 +963,32 @@ export const App = () => {
                   </p>
                 </>
               )}
+              <div className="alerts-panel">
+                <h3>Retry Backoff</h3>
+                <div className="alerts-list">
+                  {!failedRetryStatus && (
+                    <div className="alert-row">
+                      <span className="muted">No failed retry backoff entries.</span>
+                    </div>
+                  )}
+                  {failedRetryStatus && (
+                    <>
+                      <div className="alert-row">
+                        <span>Retry backoff severity: {failedRetryStatus.severity}</span>
+                      </div>
+                      <div className="alert-row">
+                        <span>Next retry window: {failedRetryStatus.nextRetryWindow}</span>
+                      </div>
+                      <div className="alert-row">
+                        <span>Max retry count: {failedRetryStatus.maxRetryCount}</span>
+                      </div>
+                      <div className="alert-row">
+                        <span>Next retry at: {new Date(failedRetryStatus.nextRetryAt).toLocaleTimeString()}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
               <div className="alerts-panel">
                 <h3>Security Warnings</h3>
                 <div className="alerts-list">
