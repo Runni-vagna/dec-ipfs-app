@@ -14,6 +14,7 @@ export type SecurityStatePayload = {
 
 export type FlushRevocationResult = {
   flushedIds: string[];
+  failedIds: string[];
 };
 
 const hasTauriRuntime = (): boolean => {

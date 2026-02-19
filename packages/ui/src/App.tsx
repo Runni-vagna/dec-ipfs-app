@@ -912,8 +912,13 @@ export const App = () => {
                     setRevocationQueue((current) =>
                       current.filter((entry) => !flushedSet.has(entry.revocationId))
                     );
-                    recordSecurityEvent("revocation.replayed", `flushed ${flushed.flushedIds.length} revoke(s) via tauri`);
-                    setActionNote(`Flushed ${flushed.flushedIds.length} revocation(s) via Tauri command.`);
+                    recordSecurityEvent(
+                      "revocation.replayed",
+                      `flushed ${flushed.flushedIds.length} revoke(s), failed ${flushed.failedIds.length}`
+                    );
+                    setActionNote(
+                      `Flushed ${flushed.flushedIds.length} revocation(s); ${flushed.failedIds.length} failed.`
+                    );
                   })()}
                 >
                   Replay Revocations

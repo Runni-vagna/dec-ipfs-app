@@ -45,6 +45,7 @@ struct SecurityState {
 #[serde(rename_all = "camelCase")]
 struct FlushRevocationResult {
     flushed_ids: Vec<String>,
+    failed_ids: Vec<String>,
 }
 
 fn to_status(state: &PrivateNodeState) -> PrivateNodeStatus {
@@ -198,17 +199,23 @@ fn set_security_state(
 #[tauri::command]
 fn flush_revocation_queue(revocation_ids: Vec<String>) -> FlushRevocationResult {
     let mut flushed_ids: Vec<String> = Vec::new();
+    let mut failed_ids: Vec<String> = Vec::new();
     for revocation_id in revocation_ids {
         let normalized = revocation_id.trim().to_string();
         if normalized.is_empty() {
+            failed_ids.push("<empty>".to_string());
             continue;
         }
         if flushed_ids.iter().any(|existing| existing == &normalized) {
+            failed_ids.push(normalized);
             continue;
         }
         flushed_ids.push(normalized);
     }
-    FlushRevocationResult { flushed_ids }
+    FlushRevocationResult {
+        flushed_ids,
+        failed_ids,
+    }
 }
 
 fn main() {

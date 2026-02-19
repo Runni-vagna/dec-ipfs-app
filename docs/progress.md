@@ -91,6 +91,9 @@
   - security audit panel now supports filters (`All`, `Identity`, `UCAN`, `Revocations`)
   - added `Export Audit` and `Clear Audit` actions in profile tools
   - expanded UI tests for audit clearing flow (`6` UI tests passing)
+- Improved revocation flush result handling:
+  - Tauri `flush_revocation_queue` now returns per-item result groups (`flushedIds`, `failedIds`)
+  - UI replay action now reports both success and failure counts in status + audit event detail
 
 ### Phase Tracking
 
