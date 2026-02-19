@@ -71,6 +71,8 @@ describe("App interactions", () => {
     expect(screen.getByText("Delegate Access")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
+    expect(screen.getByText(/Replay blocked: policy is invalid-signature/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
     expect(await screen.findByText(/Replayed 1 queued revocation\(s\)\./i)).toBeTruthy();
   });
 
