@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { Bell, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
+import { Bell, CircleHelp, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
 
 type Tab = "main" | "discover" | "private" | "alerts" | "profile";
 
@@ -78,6 +78,7 @@ export const App = () => {
   });
   const [isWizardOpen, setWizardOpen] = useState(false);
   const [isComposeOpen, setComposeOpen] = useState(false);
+  const [isHelpOpen, setHelpOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [actionNote, setActionNote] = useState("Ready");
@@ -270,9 +271,15 @@ export const App = () => {
         event.preventDefault();
         undoRemove();
       }
+      if (!inFormField && event.key === "?") {
+        event.preventDefault();
+        setHelpOpen(true);
+        setActionNote("Help opened.");
+      }
       if (event.key === "Escape") {
         setWizardOpen(false);
         setComposeOpen(false);
+        setHelpOpen(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -287,6 +294,7 @@ export const App = () => {
     setPinnedCids({});
     setWizardOpen(false);
     setComposeOpen(false);
+    setHelpOpen(false);
     setDraft("");
     setUnreadAlerts(0);
     setPosts(DEFAULT_POSTS);
@@ -378,6 +386,16 @@ export const App = () => {
                 <Search size={16} />
               </button>
               <button
+                className="icon-btn"
+                aria-label="Help"
+                onClick={() => {
+                  setHelpOpen(true);
+                  setActionNote("Help opened.");
+                }}
+              >
+                <CircleHelp size={16} />
+              </button>
+              <button
                 className={pinnedOnly ? "icon-btn pinned-active" : "icon-btn"}
                 aria-label="Toggle pinned filter"
                 onClick={() => {
@@ -456,6 +474,38 @@ export const App = () => {
                 <span />
                 <span />
                 <span />
+              </div>
+              <div className="stats-grid">
+                <button
+                  className="stats-item"
+                  onClick={() => {
+                    setPinnedOnly(false);
+                    setActionNote("Showing all posts.");
+                  }}
+                >
+                  <strong>{posts.length}</strong>
+                  <span>Total Posts</span>
+                </button>
+                <button
+                  className="stats-item"
+                  onClick={() => {
+                    setPinnedOnly(true);
+                    setActionNote("Pinned-only filter enabled.");
+                  }}
+                >
+                  <strong>{Object.values(pinnedCids).filter(Boolean).length}</strong>
+                  <span>Pinned</span>
+                </button>
+                <button
+                  className="stats-item"
+                  onClick={() => {
+                    setActiveTab("alerts");
+                    setActionNote("Switched to Alerts.");
+                  }}
+                >
+                  <strong>{unreadAlerts}</strong>
+                  <span>Unread Alerts</span>
+                </button>
               </div>
               <button
                 className="cta"
@@ -645,6 +695,35 @@ export const App = () => {
               <button className="cta" onClick={publishDraft} disabled={draft.trim().length === 0}>
                 Publish Mock Post
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isHelpOpen && (
+        <div
+          className="overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Help and shortcuts"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setHelpOpen(false);
+            }
+          }}
+        >
+          <div className="modal-card">
+            <button className="close-btn" onClick={() => setHelpOpen(false)} aria-label="Close help">
+              <X size={16} />
+            </button>
+            <h3>Help & Shortcuts</h3>
+            <div className="help-list">
+              <div><kbd>/</kbd> Open search</div>
+              <div><kbd>c</kbd> Open compose</div>
+              <div><kbd>Ctrl/Cmd + Enter</kbd> Publish compose text</div>
+              <div><kbd>u</kbd> Undo last deleted post</div>
+              <div><kbd>Esc</kbd> Close active modal</div>
+              <div><kbd>?</kbd> Open this help panel</div>
             </div>
           </div>
         </div>

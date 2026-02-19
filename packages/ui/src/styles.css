@@ -333,6 +333,34 @@ button {
 .network-map span:nth-child(4) { bottom: 20%; left: 20%; }
 .network-map span:nth-child(5) { bottom: 16%; right: 30%; }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.8rem;
+}
+
+.stats-item {
+  border: 1px solid var(--border);
+  background: #0a0e1466;
+  border-radius: 10px;
+  padding: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  align-items: flex-start;
+  color: var(--text);
+}
+
+.stats-item strong {
+  font-size: 0.95rem;
+}
+
+.stats-item span {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
 .mobile-nav {
   position: fixed;
   left: 50%;
@@ -445,6 +473,22 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
+}
+
+.help-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.help-list kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.12rem 0.35rem;
+  background: #0a0e1466;
+  margin-right: 0.35rem;
+  font-size: 0.75rem;
 }
 
 @media (max-width: 1024px) {
