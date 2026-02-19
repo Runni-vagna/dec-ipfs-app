@@ -29,6 +29,12 @@
 - Validation status (latest):
   - `pnpm test`: pass
   - `pnpm typecheck`: pass
+- Added first UI -> Tauri command bridge for private-node controls:
+  - new UI adapter: `packages/ui/src/tauri-private-node.ts` (web fallback + Tauri invoke path)
+  - wired private-node start/stop/status/peer-join controls in `packages/ui/src/App.tsx`
+  - implemented Tauri command handlers + shared in-memory state in `packages/tauri/src-tauri/src/main.rs`
+  - pinned UI dependency: `@tauri-apps/api` for command invocation
+- Runtime caveat (local environment): Tauri Rust build/check still requires Linux WebKitGTK/JSC system packages (`webkit2gtk-4.1`, `javascriptcoregtk-4.1`) before full native compile can pass.
 
 ### Phase Tracking
 

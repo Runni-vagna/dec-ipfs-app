@@ -8,6 +8,13 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Bell, CircleHelp, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
 import { createDraftPost } from "@cidfeed/core";
+import {
+  getPrivateNodeStatus,
+  simulatePeerJoinCommand,
+  startPrivateNodeCommand,
+  stopPrivateNodeCommand,
+  type PrivateNodeStatus
+} from "./tauri-private-node";
 
 type Tab = "main" | "discover" | "private" | "alerts" | "profile";
 
@@ -204,25 +211,48 @@ export const App = () => {
     setActionNote("Private wizard opened.");
   };
 
-  const togglePrivateNode = () => {
+  const applyPrivateNodeStatus = (status: PrivateNodeStatus) => {
+    setPrivateNodeOnline(status.online);
+    setPeerCount(status.peerCount);
+  };
+
+  const togglePrivateNode = async () => {
     if (privateNodeOnline) {
+      const status = await stopPrivateNodeCommand();
+      if (status) {
+        applyPrivateNodeStatus(status);
+        setActionNote("Private node stopped.");
+        return;
+      }
       setPrivateNodeOnline(false);
       setPeerCount(0);
-      setActionNote("Private node stopped.");
+      setActionNote("Private node stopped (web fallback).");
+      return;
+    }
+    const status = await startPrivateNodeCommand();
+    if (status) {
+      applyPrivateNodeStatus(status);
+      setActionNote("Private node started.");
       return;
     }
     setPrivateNodeOnline(true);
     setPeerCount(3);
-    setActionNote("Private node started.");
+    setActionNote("Private node started (web fallback).");
   };
 
-  const simulatePeerJoin = () => {
+  const simulatePeerJoin = async () => {
     if (!privateNodeOnline) {
       setActionNote("Start private node first.");
       return;
     }
+    const status = await simulatePeerJoinCommand();
+    if (status) {
+      applyPrivateNodeStatus(status);
+      setActionNote("Peer joined private swarm.");
+      return;
+    }
     setPeerCount((count) => count + 1);
-    setActionNote("Peer joined private swarm (mock).");
+    setActionNote("Peer joined private swarm (web fallback).");
   };
 
   const importDemoState = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -321,6 +351,16 @@ export const App = () => {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [lastRemoved]);
+
+  useEffect(() => {
+    void (async () => {
+      const status = await getPrivateNodeStatus();
+      if (!status) {
+        return;
+      }
+      applyPrivateNodeStatus(status);
+    })();
+  }, []);
 
   const resetDemoState = () => {
     setActiveTab("main");
@@ -554,10 +594,10 @@ export const App = () => {
                 Open Wizard
               </button>
               <div className="private-controls">
-                <button className="follow secondary" onClick={togglePrivateNode}>
+                <button className="follow secondary" onClick={() => void togglePrivateNode()}>
                   {privateNodeOnline ? "Stop Node" : "Start Node"}
                 </button>
-                <button className="follow secondary" onClick={simulatePeerJoin}>Simulate Peer Join</button>
+                <button className="follow secondary" onClick={() => void simulatePeerJoin()}>Simulate Peer Join</button>
                 <p className="muted">Private status: {privateNodeOnline ? "Online" : "Offline"} · Peers: {peerCount}</p>
               </div>
             </>
