@@ -113,6 +113,13 @@
   - `pnpm typecheck`: blocked (`env: 'node': No such file or directory`)
 - Added UI regression coverage for failed retry queue action:
   - `packages/ui/tests/app.interactions.test.tsx` now validates `Retry Failed Flushes` re-queues ready retries and replay drains the queue
+- Added UCAN revocation-list verification path:
+  - added revocation-list model + helpers in `packages/core/src/index.ts` (create, add-entry, parse/serialize, listed-check, delegation verification)
+  - expanded core tests in `packages/core/tests/create-feed-entry.test.ts` for revocation-list verification outcomes
+  - wired revocation-list persistence through Tauri security state (`packages/tauri/src-tauri/src/main.rs`, `packages/ui/src/tauri-security-state.ts`)
+  - updated profile UI in `packages/ui/src/App.tsx` with delegation verification indicator (`UCAN Active/Expiring Soon/Expired/Revoked`)
+  - added profile actions: `Verify UCAN`, `Mark Revoked`, `Clear Revocation List`
+  - added UI test coverage for revoked-status rendering in `packages/ui/tests/app.interactions.test.tsx`
 
 ### Phase Tracking
 

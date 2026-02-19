@@ -32,3 +32,5 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Core library now enforces delegation TTL bounds and requires non-empty revocation IDs.
 - Delegation payload parser rejects malformed DID/capability/version/expiry fields.
 - Offline revocation queue primitives exist for local persistence + replay on reconnect.
+- Revocation-list verification path now exists in core (`active`/`expired`/`revoked`) and is surfaced in UI profile status.
+- Revocation list state is persisted via Tauri security-state bridge for offline integrity checks.

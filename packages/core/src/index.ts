@@ -36,6 +36,16 @@ export type OfflineRevocationEntry = {
   readonly queuedAt: number;
   readonly reason: string;
 };
+export type RevocationListEntry = {
+  readonly revocationId: string;
+  readonly revokedAt: number;
+  readonly reason: string;
+};
+export type RevocationListRecord = {
+  readonly version: "1.1";
+  readonly updatedAt: number;
+  readonly entries: RevocationListEntry[];
+};
 export type RevocationReplayResult = {
   readonly replayed: OfflineRevocationEntry[];
   readonly remaining: OfflineRevocationEntry[];
@@ -53,6 +63,7 @@ export type SecurityAuditEventType =
   | "ucan.created"
   | "ucan.revoked"
   | "ucan.expired"
+  | "ucan.verified"
   | "revocation.replayed";
 export type SecurityAuditEntry = {
   readonly id: string;
@@ -638,6 +649,103 @@ export const replayOfflineRevocations = (
   };
 };
 
+export const createRevocationList = (updatedAt = Date.now()): RevocationListRecord => {
+  return {
+    version: "1.1",
+    updatedAt,
+    entries: []
+  };
+};
+
+export const addRevocationListEntry = (
+  list: RevocationListRecord,
+  revocationId: string,
+  reason: string,
+  revokedAt = Date.now()
+): RevocationListRecord => {
+  const normalizedId = revocationId.trim();
+  const normalizedReason = reason.trim();
+  if (normalizedId.length === 0) {
+    throw new Error("revocationId must be non-empty");
+  }
+  if (normalizedReason.length === 0) {
+    throw new Error("reason must be non-empty");
+  }
+  const existing = list.entries.filter((entry) => entry.revocationId !== normalizedId);
+  return {
+    version: "1.1",
+    updatedAt: revokedAt,
+    entries: [...existing, { revocationId: normalizedId, revokedAt, reason: normalizedReason }].sort(
+      (left, right) => right.revokedAt - left.revokedAt
+    )
+  };
+};
+
+export const serializeRevocationList = (list: RevocationListRecord): string => {
+  return JSON.stringify(list);
+};
+
+export const parseRevocationList = (raw: string | null | undefined): RevocationListRecord => {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return createRevocationList();
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return createRevocationList();
+  }
+  if (!isObject(parsed)) {
+    return createRevocationList();
+  }
+  const version = parsed.version;
+  const updatedAt = typeof parsed.updatedAt === "number" ? parsed.updatedAt : NaN;
+  const entriesRaw = Array.isArray(parsed.entries) ? parsed.entries : [];
+  if (version !== "1.1" || !Number.isFinite(updatedAt)) {
+    return createRevocationList();
+  }
+  const entries: RevocationListEntry[] = [];
+  for (const item of entriesRaw) {
+    if (!isObject(item)) {
+      continue;
+    }
+    const revocationId = typeof item.revocationId === "string" ? item.revocationId.trim() : "";
+    const revokedAt = typeof item.revokedAt === "number" ? item.revokedAt : NaN;
+    const reason = typeof item.reason === "string" ? item.reason.trim() : "";
+    if (revocationId.length === 0 || !Number.isFinite(revokedAt) || reason.length === 0) {
+      continue;
+    }
+    entries.push({ revocationId, revokedAt, reason });
+  }
+  return {
+    version: "1.1",
+    updatedAt,
+    entries: entries.sort((left, right) => right.revokedAt - left.revokedAt)
+  };
+};
+
+export const isRevocationListed = (list: RevocationListRecord, revocationId: string): boolean => {
+  const normalizedId = revocationId.trim();
+  if (normalizedId.length === 0) {
+    return false;
+  }
+  return list.entries.some((entry) => entry.revocationId === normalizedId);
+};
+
+export const verifyDelegationRevocation = (
+  delegation: Pick<UcanDelegationRecord, "revocationId" | "expiresAt">,
+  list: RevocationListRecord,
+  now = Date.now()
+): "active" | "expired" | "revoked" => {
+  if (isRevocationListed(list, delegation.revocationId)) {
+    return "revoked";
+  }
+  if (now >= delegation.expiresAt) {
+    return "expired";
+  }
+  return "active";
+};
+
 export const createFailedRevocationRetry = (
   revocationId: string,
   failedAt: number,
@@ -829,6 +937,7 @@ export const parseSecurityAuditLog = (raw: string | null | undefined): SecurityA
       event !== "ucan.created" &&
       event !== "ucan.revoked" &&
       event !== "ucan.expired" &&
+      event !== "ucan.verified" &&
       event !== "revocation.replayed"
     ) {
       continue;

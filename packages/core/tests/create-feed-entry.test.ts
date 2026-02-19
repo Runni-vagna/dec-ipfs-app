@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   appendSecurityAuditEntry,
   createOfflineRevocationEntry,
+  createRevocationList,
   createRevocationId,
   createSecurityAuditEntry,
   createUcanDelegation,
@@ -24,9 +25,11 @@ import {
   getUcanRemainingMs,
   isUcanDelegationExpiringSoon,
   isUcanDelegationExpired,
+  isRevocationListed,
   isValidDidKey,
   parseOfflineRevocationQueue,
   parseFailedRevocationRetries,
+  parseRevocationList,
   parseSecurityAuditLog,
   replayOfflineRevocations,
   parseIdentityRecord,
@@ -39,6 +42,7 @@ import {
   restoreFeedPost,
   serializeFailedRevocationRetries,
   serializeOfflineRevocationQueue,
+  serializeRevocationList,
   serializeSecurityAuditLog,
   serializeIdentityRecord,
   serializeUcanDelegation,
@@ -46,7 +50,8 @@ import {
   splitReadyFailedRetries,
   toFeedPost,
   toggleFlag,
-  upsertFailedRevocationRetries
+  upsertFailedRevocationRetries,
+  verifyDelegationRevocation
 } from "../src";
 
 describe("createFeedEntry", () => {
@@ -297,6 +302,38 @@ describe("ucan and revocation helpers", () => {
     const full = replayOfflineRevocations(partial.remaining, 10);
     expect(full.replayed).toHaveLength(1);
     expect(full.remaining).toHaveLength(0);
+  });
+
+  it("verifies delegation against revocation list", () => {
+    const delegation = createUcanDelegation({
+      issuerDid: issuer,
+      audienceDid: audience,
+      capabilities: [{ with: issuer, can: "feed/read" }],
+      issuedAt: 1700000000000,
+      ttlSeconds: 300
+    });
+    const emptyList = createRevocationList(1700000000000);
+    expect(verifyDelegationRevocation(delegation, emptyList, 1700000010000)).toBe("active");
+    expect(verifyDelegationRevocation(delegation, emptyList, 1700000400000)).toBe("expired");
+
+    const listed = parseRevocationList(
+      JSON.stringify({
+        version: "1.1",
+        updatedAt: 1700000020000,
+        entries: [{ revocationId: delegation.revocationId, revokedAt: 1700000020000, reason: "manual revoke" }]
+      })
+    );
+    expect(isRevocationListed(listed, delegation.revocationId)).toBe(true);
+    expect(verifyDelegationRevocation(delegation, listed, 1700000010000)).toBe("revoked");
+  });
+
+  it("serializes and parses revocation list safely", () => {
+    const list = createRevocationList(1700000000000);
+    const serialized = serializeRevocationList(list);
+    const parsed = parseRevocationList(serialized);
+    expect(parsed.version).toBe("1.1");
+    expect(parsed.entries).toHaveLength(0);
+    expect(parseRevocationList("bad-json").entries).toHaveLength(0);
   });
 });
 

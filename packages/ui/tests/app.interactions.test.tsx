@@ -144,4 +144,34 @@ describe("App interactions", () => {
       )
     ).toBeTruthy();
   });
+
+  it("shows revoked status when delegation revocation id exists in revocation list", () => {
+    const now = Date.now();
+    window.localStorage.setItem(
+      "cidfeed.ui.ucanDelegation",
+      JSON.stringify({
+        issuerDid: "did:key:z123456789ABCDEFGHJKLMN",
+        audienceDid: "did:key:z123456789ABCDEFGHJKLMP",
+        capabilities: [{ with: "did:key:z123456789ABCDEFGHJKLMN", can: "feed/publish" }],
+        issuedAt: now - 1000,
+        expiresAt: now + 3600_000,
+        revocationId: "revoke-listed-1",
+        nonce: "abc123",
+        version: "1.1"
+      })
+    );
+    window.localStorage.setItem(
+      "cidfeed.ui.revocationList",
+      JSON.stringify({
+        version: "1.1",
+        updatedAt: now,
+        entries: [{ revocationId: "revoke-listed-1", revokedAt: now, reason: "test marker" }]
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    expect(screen.getByText("UCAN Revoked")).toBeTruthy();
+  });
 });

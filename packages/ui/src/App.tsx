@@ -9,8 +9,10 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode 
 import { Bell, CircleHelp, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
 import {
   appendSecurityAuditEntry,
+  addRevocationListEntry,
   createSecurityAuditEntry,
   createOfflineRevocationEntry,
+  createRevocationList,
   createFeedStateSnapshot,
   createIdentityRecord,
   createResetFeedState,
@@ -24,6 +26,7 @@ import {
   parseFailedRevocationRetries,
   parseOfflineRevocationQueue,
   parseIdentityRecord,
+  parseRevocationList,
   parseActiveTab,
   parseUcanDelegation,
   parseImportedFeedState,
@@ -37,6 +40,7 @@ import {
   serializeFailedRevocationRetries,
   serializeOfflineRevocationQueue,
   serializeIdentityRecord,
+  serializeRevocationList,
   serializeSecurityAuditLog,
   serializeUcanDelegation,
   serializeFeedStateSnapshot,
@@ -47,10 +51,12 @@ import {
   type FailedRevocationRetry,
   type IdentityRecord,
   type OfflineRevocationEntry,
+  type RevocationListRecord,
   type RemovedPostSnapshot,
   type SecurityAuditEntry,
   type UcanDelegationRecord,
-  upsertFailedRevocationRetries
+  upsertFailedRevocationRetries,
+  verifyDelegationRevocation
 } from "@cidfeed/core";
 import {
   getPrivateNodeStatus,
@@ -86,6 +92,7 @@ const STORAGE_KEYS = {
   identity: "cidfeed.ui.identity",
   ucan: "cidfeed.ui.ucanDelegation",
   revocations: "cidfeed.ui.offlineRevocationQueue",
+  revocationList: "cidfeed.ui.revocationList",
   auditLog: "cidfeed.ui.securityAuditLog",
   failedFlushQueue: "cidfeed.ui.failedFlushQueue"
 } as const;
@@ -153,6 +160,12 @@ export const App = () => {
     }
     return parseOfflineRevocationQueue(window.localStorage.getItem(STORAGE_KEYS.revocations));
   });
+  const [revocationList, setRevocationList] = useState<RevocationListRecord>(() => {
+    if (typeof window === "undefined") {
+      return createRevocationList();
+    }
+    return parseRevocationList(window.localStorage.getItem(STORAGE_KEYS.revocationList));
+  });
   const [auditLog, setAuditLog] = useState<SecurityAuditEntry[]>(() => {
     if (typeof window === "undefined") {
       return [];
@@ -173,7 +186,14 @@ export const App = () => {
   const [timeTick, setTimeTick] = useState(() => Date.now());
 
   const recordSecurityEvent = (
-    event: "identity.created" | "identity.cleared" | "ucan.created" | "ucan.revoked" | "ucan.expired" | "revocation.replayed",
+    event:
+      | "identity.created"
+      | "identity.cleared"
+      | "ucan.created"
+      | "ucan.revoked"
+      | "ucan.expired"
+      | "ucan.verified"
+      | "revocation.replayed",
     detail: string
   ) => {
     const entry = createSecurityAuditEntry(event, detail);
@@ -231,6 +251,13 @@ export const App = () => {
     );
     return sorted;
   }, [auditFilter, auditLog, auditQuery, auditSort]);
+
+  const delegationStatus = useMemo(() => {
+    if (!delegation) {
+      return null;
+    }
+    return verifyDelegationRevocation(delegation, revocationList, timeTick);
+  }, [delegation, revocationList, timeTick]);
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -430,6 +457,7 @@ export const App = () => {
         setIdentity(parseIdentityRecord(payload.identityJson));
         setDelegation(parseUcanDelegation(payload.delegationJson));
         setRevocationQueue(parseOfflineRevocationQueue(payload.revocationQueueJson));
+        setRevocationList(parseRevocationList(payload.revocationListJson));
         setAuditLog(parseSecurityAuditLog(payload.auditLogJson));
         setFailedFlushQueue(parseFailedRevocationRetries(payload.failedFlushQueueJson));
       }
@@ -449,6 +477,7 @@ export const App = () => {
     const identityJson = identity ? serializeIdentityRecord(identity) : null;
     const delegationJson = delegation ? serializeUcanDelegation(delegation) : null;
     const revocationQueueJson = revocationQueue.length > 0 ? serializeOfflineRevocationQueue(revocationQueue) : null;
+    const revocationListJson = revocationList.entries.length > 0 ? serializeRevocationList(revocationList) : null;
     const auditLogJson = auditLog.length > 0 ? serializeSecurityAuditLog(auditLog) : null;
     const failedFlushQueueJson =
       failedFlushQueue.length > 0 ? serializeFailedRevocationRetries(failedFlushQueue) : null;
@@ -468,6 +497,11 @@ export const App = () => {
     } else {
       window.localStorage.removeItem(STORAGE_KEYS.revocations);
     }
+    if (revocationListJson) {
+      window.localStorage.setItem(STORAGE_KEYS.revocationList, revocationListJson);
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.revocationList);
+    }
     if (auditLogJson) {
       window.localStorage.setItem(STORAGE_KEYS.auditLog, auditLogJson);
     } else {
@@ -483,10 +517,11 @@ export const App = () => {
       identityJson,
       delegationJson,
       revocationQueueJson,
+      revocationListJson,
       auditLogJson,
       failedFlushQueueJson
     });
-  }, [auditLog, delegation, failedFlushQueue, identity, revocationQueue, securityHydrated]);
+  }, [auditLog, delegation, failedFlushQueue, identity, revocationList, revocationQueue, securityHydrated]);
 
   useEffect(() => {
     if (activeTab === "alerts" && unreadAlerts > 0) {
@@ -504,6 +539,9 @@ export const App = () => {
     }
     const entry = createOfflineRevocationEntry(delegation.revocationId, "auto revoke on expiry", timeTick);
     setRevocationQueue((current) => enqueueOfflineRevocation(current, entry));
+    setRevocationList((current) =>
+      addRevocationListEntry(current, delegation.revocationId, "auto revoke on expiry", timeTick)
+    );
     setDelegation(null);
     recordSecurityEvent("ucan.expired", `delegation expired for ${formatDidHandle(delegation.audienceDid)}`);
     setActionNote("UCAN expired and was queued for revocation replay.");
@@ -572,6 +610,7 @@ export const App = () => {
     setIdentity(null);
     setDelegation(null);
     setRevocationQueue([]);
+    setRevocationList(createRevocationList());
     setAuditLog([]);
     setFailedFlushQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
@@ -582,6 +621,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.identity);
     window.localStorage.removeItem(STORAGE_KEYS.ucan);
     window.localStorage.removeItem(STORAGE_KEYS.revocations);
+    window.localStorage.removeItem(STORAGE_KEYS.revocationList);
     window.localStorage.removeItem(STORAGE_KEYS.auditLog);
     window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
     setActionNote("Demo state reset.");
@@ -811,17 +851,19 @@ export const App = () => {
                 <span>{delegation ? formatDidHandle(delegation.audienceDid) : "No UCAN delegation"}</span>
                 <span className="muted">
                   {delegation
-                    ? isUcanDelegationExpired(delegation, timeTick)
-                      ? "UCAN Expired"
-                      : isUcanDelegationExpiringSoon(delegation, 5 * 60 * 1000, timeTick)
-                        ? "UCAN Expiring Soon"
-                        : "UCAN Active"
+                    ? delegationStatus === "revoked"
+                      ? "UCAN Revoked"
+                      : delegationStatus === "expired"
+                        ? "UCAN Expired"
+                        : isUcanDelegationExpiringSoon(delegation, 5 * 60 * 1000, timeTick)
+                          ? "UCAN Expiring Soon"
+                          : "UCAN Active"
                     : "Delegate Access"}
                 </span>
               </div>
               {delegation && (
                 <p className="muted">
-                  Expires: {new Date(delegation.expiresAt).toLocaleString()} · Revocations queued: {revocationQueue.length} · Failed flush retries: {failedFlushQueue.length}
+                  Expires: {new Date(delegation.expiresAt).toLocaleString()} · Revocations queued: {revocationQueue.length} · Revocation list: {revocationList.entries.length} · Failed flush retries: {failedFlushQueue.length}
                 </p>
               )}
               <div className="alerts-panel">
@@ -962,6 +1004,9 @@ export const App = () => {
                       "manual profile revoke"
                     );
                     setRevocationQueue((current) => enqueueOfflineRevocation(current, entry));
+                    setRevocationList((current) =>
+                      addRevocationListEntry(current, delegation.revocationId, "manual profile revoke")
+                    );
                     setDelegation(null);
                     recordSecurityEvent("ucan.revoked", `queued revoke for ${formatDidHandle(delegation.audienceDid)}`);
                     setActionNote("UCAN revoked and queued for offline replay.");
@@ -988,6 +1033,13 @@ export const App = () => {
                     }
                     const replayedSet = new Set(result.replayed.map((entry) => entry.revocationId));
                     setRevocationQueue((current) => current.filter((entry) => !replayedSet.has(entry.revocationId)));
+                    setRevocationList((current) => {
+                      let next = current;
+                      for (const revocationId of flushed.flushedIds) {
+                        next = addRevocationListEntry(next, revocationId, "flushed replay");
+                      }
+                      return next;
+                    });
                     setFailedFlushQueue((current) =>
                       upsertFailedRevocationRetries(
                         removeFailedRetries(current, flushed.flushedIds),
@@ -1006,6 +1058,48 @@ export const App = () => {
                   })()}
                 >
                   Replay Revocations
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    if (!delegation) {
+                      setActionNote("No active UCAN delegation to verify.");
+                      return;
+                    }
+                    const status = verifyDelegationRevocation(delegation, revocationList, Date.now());
+                    recordSecurityEvent(
+                      "ucan.verified",
+                      `delegation ${status} for ${formatDidHandle(delegation.audienceDid)}`
+                    );
+                    setActionNote(`UCAN verification result: ${status}.`);
+                  }}
+                >
+                  Verify UCAN
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    if (!delegation) {
+                      setActionNote("No active UCAN delegation to mark revoked.");
+                      return;
+                    }
+                    setRevocationList((current) =>
+                      addRevocationListEntry(current, delegation.revocationId, "manual verification marker")
+                    );
+                    recordSecurityEvent("ucan.verified", `marked ${delegation.revocationId} as revoked`);
+                    setActionNote("Current delegation marked in revocation list.");
+                  }}
+                >
+                  Mark Revoked
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    setRevocationList(createRevocationList());
+                    setActionNote("Revocation list cleared.");
+                  }}
+                >
+                  Clear Revocation List
                 </button>
                 <button
                   className="follow secondary"
