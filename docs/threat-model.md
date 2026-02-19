@@ -39,3 +39,4 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Trust policy added for revocation-list issuer verification (`valid` / `untrusted-issuer` / `invalid-signature`) with explicit issuer trust controls in profile.
 - Profile now surfaces security warnings when revocation policy is unsafe (`invalid-signature`/`untrusted-issuer`) or replay queues accumulate.
 - Profile now surfaces retry backoff severity and next retry window to reduce stale offline revocation state.
+- Escalation banner now activates after repeated high-severity retry intervals to force operator attention on replay path degradation.

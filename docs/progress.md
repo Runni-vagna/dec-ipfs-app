@@ -144,6 +144,10 @@
   - profile now includes `Retry Backoff` summary with severity (`low`/`medium`/`high`), next retry window, max retry count, and next retry timestamp
   - warning messages now include backoff severity and next retry window context
   - expanded UI tests for ready-now retry backoff rendering
+- Added automatic high-backoff escalation banner:
+  - profile now includes an `Escalation` panel that activates when high backoff severity persists for repeated intervals
+  - high-severity streak counter is persisted in local storage (`cidfeed.ui.retryHighStreak`) and reset when risk clears
+  - expanded UI tests for escalation banner rendering on persisted high-backoff streak
 
 ### Phase Tracking
 

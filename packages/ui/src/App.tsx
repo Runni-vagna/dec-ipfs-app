@@ -100,7 +100,8 @@ const STORAGE_KEYS = {
   revocationList: "cidfeed.ui.revocationList",
   trustedRevocationIssuers: "cidfeed.ui.trustedRevocationIssuers",
   auditLog: "cidfeed.ui.securityAuditLog",
-  failedFlushQueue: "cidfeed.ui.failedFlushQueue"
+  failedFlushQueue: "cidfeed.ui.failedFlushQueue",
+  retryHighStreak: "cidfeed.ui.retryHighStreak"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -196,6 +197,14 @@ export const App = () => {
   const [selectedAuditEntry, setSelectedAuditEntry] = useState<SecurityAuditEntry | null>(null);
   const [securityHydrated, setSecurityHydrated] = useState(false);
   const [timeTick, setTimeTick] = useState(() => Date.now());
+  const [retryHighStreak, setRetryHighStreak] = useState<number>(() => {
+    if (typeof window === "undefined") {
+      return 0;
+    }
+    const raw = window.localStorage.getItem(STORAGE_KEYS.retryHighStreak);
+    const parsed = raw ? Number(raw) : 0;
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+  });
 
   const recordSecurityEvent = (
     event:
@@ -316,6 +325,7 @@ export const App = () => {
     revocationListPolicyStatus,
     revocationQueue.length
   ]);
+  const retryEscalationActive = useMemo(() => retryHighStreak >= 3, [retryHighStreak]);
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -541,6 +551,15 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
+    setRetryHighStreak((current) => {
+      if (!failedRetryStatus || failedRetryStatus.severity !== "high") {
+        return 0;
+      }
+      return current + 1;
+    });
+  }, [failedRetryStatus?.severity, timeTick]);
+
+  useEffect(() => {
     if (!securityHydrated) {
       return;
     }
@@ -589,6 +608,11 @@ export const App = () => {
     } else {
       window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
     }
+    if (retryHighStreak > 0) {
+      window.localStorage.setItem(STORAGE_KEYS.retryHighStreak, String(retryHighStreak));
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.retryHighStreak);
+    }
 
     void saveSecurityStateCommand({
       identityJson,
@@ -606,6 +630,7 @@ export const App = () => {
     identity,
     revocationList,
     revocationQueue,
+    retryHighStreak,
     securityHydrated,
     trustedRevocationIssuers
   ]);
@@ -699,6 +724,7 @@ export const App = () => {
     setRevocationQueue([]);
     setRevocationList(createRevocationList());
     setTrustedRevocationIssuers([]);
+    setRetryHighStreak(0);
     setAuditLog([]);
     setFailedFlushQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
@@ -711,6 +737,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.revocations);
     window.localStorage.removeItem(STORAGE_KEYS.revocationList);
     window.localStorage.removeItem(STORAGE_KEYS.trustedRevocationIssuers);
+    window.localStorage.removeItem(STORAGE_KEYS.retryHighStreak);
     window.localStorage.removeItem(STORAGE_KEYS.auditLog);
     window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
     setActionNote("Demo state reset.");
@@ -963,6 +990,24 @@ export const App = () => {
                   </p>
                 </>
               )}
+              <div className="alerts-panel">
+                <h3>Escalation</h3>
+                <div className="alerts-list">
+                  {!retryEscalationActive && (
+                    <div className="alert-row">
+                      <span className="muted">No active escalation.</span>
+                    </div>
+                  )}
+                  {retryEscalationActive && (
+                    <div className="alert-row">
+                      <span>
+                        Escalation active: high retry backoff persisted for {retryHighStreak} interval(s). Review swarm
+                        connectivity and replay pipeline.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="alerts-panel">
                 <h3>Retry Backoff</h3>
                 <div className="alerts-list">

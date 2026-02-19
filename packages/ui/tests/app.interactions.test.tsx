@@ -304,4 +304,26 @@ describe("App interactions", () => {
     expect(screen.getByText("Next retry window: ready now")).toBeTruthy();
     expect(screen.getByText("Max retry count: 5")).toBeTruthy();
   });
+
+  it("shows escalation banner when high retry backoff persists", () => {
+    const now = Date.now();
+    window.localStorage.setItem("cidfeed.ui.retryHighStreak", "3");
+    window.localStorage.setItem(
+      "cidfeed.ui.failedFlushQueue",
+      JSON.stringify([
+        {
+          revocationId: "revoke-escalation-1",
+          failedAt: now - 60_000,
+          retryCount: 6,
+          nextRetryAt: now - 1000,
+          lastError: "tauri flush failed"
+        }
+      ])
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+
+    expect(screen.getByText(/Escalation active: high retry backoff persisted/i)).toBeTruthy();
+  });
 });
