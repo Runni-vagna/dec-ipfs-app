@@ -5,16 +5,73 @@
  * Immutability: CIDs are permanent
  */
 
-import { Bell, Compass, Home, Plus, Search, Shield, User } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Bell, Compass, Home, Plus, Search, Shield, User, X } from "lucide-react";
 
-const feedRows = [
-  "bafybeigd... CIDFeed content sharing post",
-  "bafybeih2... Swarm update: private peers online",
-  "bafybeiak... OrbitDB sync in 642ms",
-  "bafybeip7... Published immutable post CID"
-];
+type Tab = "main" | "discover" | "private" | "alerts" | "profile";
+
+type FeedItem = {
+  cid: string;
+  body: string;
+  tag: Tab | "all";
+};
 
 export const App = () => {
+  const [activeTab, setActiveTab] = useState<Tab>("main");
+  const [isSearchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [followedCids, setFollowedCids] = useState<Record<string, boolean>>({});
+  const [isWizardOpen, setWizardOpen] = useState(false);
+  const [isComposeOpen, setComposeOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [posts, setPosts] = useState<FeedItem[]>([
+    { cid: "bafybeigd", body: "CIDFeed content sharing post", tag: "main" },
+    { cid: "bafybeih2", body: "Swarm update: private peers online", tag: "private" },
+    { cid: "bafybeiak", body: "OrbitDB sync in 642ms", tag: "discover" },
+    { cid: "bafybeip7", body: "Published immutable post CID", tag: "alerts" }
+  ]);
+
+  const filteredPosts = useMemo(() => {
+    const tabFiltered = posts.filter((post) => post.tag === activeTab || post.tag === "all");
+    const lowered = query.trim().toLowerCase();
+    if (lowered.length === 0) {
+      return tabFiltered;
+    }
+    return tabFiltered.filter(
+      (post) => post.cid.toLowerCase().includes(lowered) || post.body.toLowerCase().includes(lowered)
+    );
+  }, [activeTab, posts, query]);
+
+  const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
+    { id: "main", label: "Main", icon: <Home size={16} /> },
+    { id: "discover", label: "Discover", icon: <Compass size={16} /> },
+    { id: "private", label: "Private", icon: <Shield size={16} /> },
+    { id: "alerts", label: "Alerts", icon: <Bell size={16} /> },
+    { id: "profile", label: "Profile", icon: <User size={16} /> }
+  ];
+
+  const publishDraft = () => {
+    const trimmed = draft.trim();
+    if (trimmed.length === 0) {
+      return;
+    }
+    const stamp = Date.now().toString(36);
+    setPosts((current) => [
+      { cid: `bafy${stamp.slice(0, 5)}`, body: trimmed, tag: activeTab },
+      ...current
+    ]);
+    setDraft("");
+    setComposeOpen(false);
+  };
+
+  const tabTitle: Record<Tab, string> = {
+    main: "Main",
+    discover: "Discover",
+    private: "Private",
+    alerts: "Alerts",
+    profile: "Profile"
+  };
+
   return (
     <div className="app-shell">
       <div className="ambient" aria-hidden="true" />
@@ -22,30 +79,74 @@ export const App = () => {
         <aside className="glass panel sidebar">
           <div className="brand">CIDFeed</div>
           <nav className="nav-list" aria-label="Desktop nav">
-            <button className="nav-item active"><Home size={16} />Main</button>
-            <button className="nav-item"><Compass size={16} />Discover</button>
-            <button className="nav-item"><Shield size={16} />Private</button>
-            <button className="nav-item"><Bell size={16} />Alerts</button>
-            <button className="nav-item"><User size={16} />Profile</button>
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                className={activeTab === item.id ? "nav-item active" : "nav-item"}
+                onClick={() => setActiveTab(item.id)}
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            ))}
           </nav>
           <div className="muted">Offline-first · No server custody</div>
         </aside>
 
         <section className="glass panel feed">
           <header className="feed-header">
-            <h1>Main Feed</h1>
-            <button className="icon-btn" aria-label="Search"><Search size={16} /></button>
+            <h1>{tabTitle[activeTab]} Feed</h1>
+            <div className="header-actions">
+              {isSearchOpen && (
+                <input
+                  className="search-input"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search CID or content"
+                  aria-label="Search posts"
+                />
+              )}
+              <button
+                className="icon-btn"
+                aria-label="Search"
+                onClick={() => setSearchOpen((open) => !open)}
+              >
+                <Search size={16} />
+              </button>
+            </div>
           </header>
           <div className="timeline" role="list">
-            {feedRows.map((row) => (
-              <article className="feed-card" key={row} role="listitem">
+            {filteredPosts.length === 0 && (
+              <article className="feed-card" role="listitem">
                 <div>
-                  <p className="cid">{row}</p>
-                  <p className="muted">Immutable CID · live OrbitDB update</p>
+                  <p className="cid">No posts match this view.</p>
+                  <p className="muted">Try another tab or clear search.</p>
                 </div>
-                <button className="follow">Follow</button>
               </article>
-            ))}
+            )}
+            {filteredPosts.map((post) => {
+              const key = `${post.cid}-${post.body}`;
+              const isFollowed = followedCids[post.cid] === true;
+              return (
+                <article className="feed-card" key={key} role="listitem">
+                  <div>
+                    <p className="cid">{post.cid}... {post.body}</p>
+                    <p className="muted">Immutable CID · live OrbitDB update</p>
+                  </div>
+                  <button
+                    className={isFollowed ? "follow following" : "follow"}
+                    onClick={() =>
+                      setFollowedCids((current) => ({
+                        ...current,
+                        [post.cid]: !current[post.cid]
+                      }))
+                    }
+                  >
+                    {isFollowed ? "Following" : "Follow"}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -59,17 +160,68 @@ export const App = () => {
             <span />
             <span />
           </div>
-          <button className="cta">Open Wizard</button>
+          <button className="cta" onClick={() => setWizardOpen(true)}>Open Wizard</button>
         </aside>
       </main>
 
       <nav className="mobile-nav glass" aria-label="Mobile nav">
-        <button><Home size={17} /></button>
-        <button><Search size={17} /></button>
-        <button className="fab" aria-label="Compose"><Plus size={20} /></button>
-        <button><Bell size={17} /></button>
-        <button><User size={17} /></button>
+        <button
+          className={activeTab === "main" ? "active-mobile" : ""}
+          onClick={() => setActiveTab("main")}
+        >
+          <Home size={17} />
+        </button>
+        <button onClick={() => setSearchOpen((open) => !open)}><Search size={17} /></button>
+        <button className="fab" aria-label="Compose" onClick={() => setComposeOpen(true)}>
+          <Plus size={20} />
+        </button>
+        <button
+          className={activeTab === "alerts" ? "active-mobile" : ""}
+          onClick={() => setActiveTab("alerts")}
+        >
+          <Bell size={17} />
+        </button>
+        <button
+          className={activeTab === "profile" ? "active-mobile" : ""}
+          onClick={() => setActiveTab("profile")}
+        >
+          <User size={17} />
+        </button>
       </nav>
+
+      {isWizardOpen && (
+        <div className="overlay" role="dialog" aria-modal="true" aria-label="Private node wizard">
+          <div className="modal-card">
+            <button className="close-btn" onClick={() => setWizardOpen(false)} aria-label="Close wizard">
+              <X size={16} />
+            </button>
+            <h3>Private Node Wizard</h3>
+            <p className="muted">Choose onboarding path:</p>
+            <div className="wizard-actions">
+              <button className="cta">Easy Mode</button>
+              <button className="follow">Private Swarm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isComposeOpen && (
+        <div className="overlay" role="dialog" aria-modal="true" aria-label="Compose post">
+          <div className="modal-card">
+            <button className="close-btn" onClick={() => setComposeOpen(false)} aria-label="Close composer">
+              <X size={16} />
+            </button>
+            <h3>Compose</h3>
+            <textarea
+              className="compose-textarea"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Write immutable CID content..."
+            />
+            <button className="cta" onClick={publishDraft}>Publish Mock Post</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

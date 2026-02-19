@@ -102,6 +102,22 @@ button {
   margin-bottom: 0.75rem;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search-input {
+  border: 1px solid var(--border);
+  background: #0a0e147a;
+  color: var(--text);
+  border-radius: 10px;
+  height: 34px;
+  padding: 0 0.6rem;
+  width: 210px;
+}
+
 .feed-header h1 {
   margin: 0;
   font-size: 1.35rem;
@@ -161,6 +177,12 @@ button {
   cursor: pointer;
 }
 
+.follow.following {
+  background: #0c2c28;
+  color: #8eeede;
+  border: 1px solid var(--border);
+}
+
 .right-rail h2 {
   margin-top: 0;
   margin-bottom: 0.6rem;
@@ -216,6 +238,11 @@ button {
   border-radius: 10px;
 }
 
+.mobile-nav .active-mobile {
+  border: 1px solid var(--border);
+  background: #0a0e1470;
+}
+
 .mobile-nav .fab {
   background: linear-gradient(120deg, var(--accent), #00d9bb);
   color: #06201c;
@@ -224,6 +251,61 @@ button {
   height: 52px;
   margin-top: -18px;
   box-shadow: 0 0 24px #00f5d47a;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: #02050abf;
+  display: grid;
+  place-items: center;
+  z-index: 30;
+  padding: 1rem;
+}
+
+.modal-card {
+  width: min(460px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1rem;
+  background: #10192bcf;
+  backdrop-filter: blur(12px);
+  position: relative;
+}
+
+.modal-card h3 {
+  margin-top: 0;
+}
+
+.close-btn {
+  position: absolute;
+  right: 0.8rem;
+  top: 0.8rem;
+  border: 1px solid var(--border);
+  background: #0a0e1470;
+  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+}
+
+.wizard-actions {
+  margin-top: 0.8rem;
+  display: flex;
+  gap: 0.6rem;
+}
+
+.compose-textarea {
+  width: 100%;
+  min-height: 110px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #0a0e147a;
+  color: var(--text);
+  padding: 0.7rem;
+  margin-bottom: 0.75rem;
+  resize: vertical;
 }
 
 @media (max-width: 1024px) {
