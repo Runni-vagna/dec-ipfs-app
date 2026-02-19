@@ -155,6 +155,7 @@ export const App = () => {
   const [auditFilter, setAuditFilter] = useState<AuditFilter>("all");
   const [auditQuery, setAuditQuery] = useState("");
   const [auditSort, setAuditSort] = useState<AuditSort>("newest");
+  const [selectedAuditEntry, setSelectedAuditEntry] = useState<SecurityAuditEntry | null>(null);
   const [securityHydrated, setSecurityHydrated] = useState(false);
   const [timeTick, setTimeTick] = useState(() => Date.now());
 
@@ -514,6 +515,7 @@ export const App = () => {
         setWizardOpen(false);
         setComposeOpen(false);
         setHelpOpen(false);
+        setSelectedAuditEntry(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -858,10 +860,18 @@ export const App = () => {
                 </div>
                 <div className="alerts-list">
                   {filteredAuditLog.slice(0, 5).map((entry) => (
-                    <div className="alert-row" key={entry.id}>
+                    <button
+                      type="button"
+                      className="alert-row"
+                      key={entry.id}
+                      onClick={() => {
+                        setSelectedAuditEntry(entry);
+                        setActionNote(`Opened audit entry ${entry.event}.`);
+                      }}
+                    >
                       <span>{entry.event}</span>
                       <span className="muted">{new Date(entry.timestamp).toLocaleTimeString()}</span>
-                    </div>
+                    </button>
                   ))}
                   {filteredAuditLog.length === 0 && (
                     <div className="alert-row">
@@ -1211,6 +1221,33 @@ export const App = () => {
               <div><kbd>u</kbd> Undo last deleted post</div>
               <div><kbd>Esc</kbd> Close active modal</div>
               <div><kbd>?</kbd> Open this help panel</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedAuditEntry && (
+        <div
+          className="overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Audit entry detail"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedAuditEntry(null);
+            }
+          }}
+        >
+          <div className="modal-card">
+            <button className="close-btn" onClick={() => setSelectedAuditEntry(null)} aria-label="Close audit detail">
+              <X size={16} />
+            </button>
+            <h3>Audit Entry</h3>
+            <div className="help-list">
+              <div><strong>Event:</strong> {selectedAuditEntry.event}</div>
+              <div><strong>Detail:</strong> {selectedAuditEntry.detail}</div>
+              <div><strong>Timestamp:</strong> {new Date(selectedAuditEntry.timestamp).toISOString()}</div>
+              <div><strong>ID:</strong> {selectedAuditEntry.id}</div>
             </div>
           </div>
         </div>

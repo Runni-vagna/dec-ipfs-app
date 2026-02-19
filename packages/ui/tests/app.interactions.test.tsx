@@ -100,4 +100,18 @@ describe("App interactions", () => {
     expect(screen.getByText("ucan.created")).toBeTruthy();
     expect(screen.queryByText("identity.created")).toBeNull();
   });
+
+  it("opens and closes audit entry detail modal", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create DID" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /identity\.created/i }));
+    expect(screen.getByText("Audit Entry")).toBeTruthy();
+    expect(screen.getByText(/Event:/i)).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByText("Audit Entry")).toBeNull();
+  });
 });

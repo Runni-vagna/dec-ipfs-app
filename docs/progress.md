@@ -98,6 +98,10 @@
   - profile security audit panel now supports text search across event + detail fields
   - added chronological sort controls (`Newest` / `Oldest`) for audit entries
   - expanded UI interaction tests for audit search behavior (`7` UI tests passing)
+- Added audit entry detail inspection:
+  - audit rows are now clickable and open a dedicated detail modal with event/detail/timestamp/id
+  - modal supports escape/overlay close behavior consistent with existing dialogs
+  - expanded UI interactions tests for audit detail open/close flow (`8` UI tests passing)
 
 ### Phase Tracking
 
