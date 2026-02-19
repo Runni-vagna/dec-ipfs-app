@@ -8,6 +8,8 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Bell, CircleHelp, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
 import {
+  appendSecurityAuditEntry,
+  createSecurityAuditEntry,
   createOfflineRevocationEntry,
   createFeedStateSnapshot,
   createIdentityRecord,
@@ -24,12 +26,14 @@ import {
   parseActiveTab,
   parseUcanDelegation,
   parseImportedFeedState,
+  parseSecurityAuditLog,
   replayOfflineRevocations,
   prependFeedPost,
   removeFeedPost,
   restoreFeedPost,
   serializeOfflineRevocationQueue,
   serializeIdentityRecord,
+  serializeSecurityAuditLog,
   serializeUcanDelegation,
   serializeFeedStateSnapshot,
   toFeedPost,
@@ -39,6 +43,7 @@ import {
   type IdentityRecord,
   type OfflineRevocationEntry,
   type RemovedPostSnapshot,
+  type SecurityAuditEntry,
   type UcanDelegationRecord
 } from "@cidfeed/core";
 import {
@@ -72,7 +77,8 @@ const STORAGE_KEYS = {
   pins: "cidfeed.ui.pinnedCids",
   identity: "cidfeed.ui.identity",
   ucan: "cidfeed.ui.ucanDelegation",
-  revocations: "cidfeed.ui.offlineRevocationQueue"
+  revocations: "cidfeed.ui.offlineRevocationQueue",
+  auditLog: "cidfeed.ui.securityAuditLog"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -138,8 +144,22 @@ export const App = () => {
     }
     return parseOfflineRevocationQueue(window.localStorage.getItem(STORAGE_KEYS.revocations));
   });
+  const [auditLog, setAuditLog] = useState<SecurityAuditEntry[]>(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+    return parseSecurityAuditLog(window.localStorage.getItem(STORAGE_KEYS.auditLog));
+  });
   const [securityHydrated, setSecurityHydrated] = useState(false);
   const [timeTick, setTimeTick] = useState(() => Date.now());
+
+  const recordSecurityEvent = (
+    event: "identity.created" | "identity.cleared" | "ucan.created" | "ucan.revoked" | "ucan.expired" | "revocation.replayed",
+    detail: string
+  ) => {
+    const entry = createSecurityAuditEntry(event, detail);
+    setAuditLog((current) => appendSecurityAuditEntry(current, entry, 120));
+  };
   const [privateNodeOnline, setPrivateNodeOnline] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
   const [draft, setDraft] = useState("");
@@ -356,6 +376,7 @@ export const App = () => {
         setIdentity(parseIdentityRecord(payload.identityJson));
         setDelegation(parseUcanDelegation(payload.delegationJson));
         setRevocationQueue(parseOfflineRevocationQueue(payload.revocationQueueJson));
+        setAuditLog(parseSecurityAuditLog(payload.auditLogJson));
       }
       setSecurityHydrated(true);
     })();
@@ -373,6 +394,7 @@ export const App = () => {
     const identityJson = identity ? serializeIdentityRecord(identity) : null;
     const delegationJson = delegation ? serializeUcanDelegation(delegation) : null;
     const revocationQueueJson = revocationQueue.length > 0 ? serializeOfflineRevocationQueue(revocationQueue) : null;
+    const auditLogJson = auditLog.length > 0 ? serializeSecurityAuditLog(auditLog) : null;
 
     if (identityJson) {
       window.localStorage.setItem(STORAGE_KEYS.identity, identityJson);
@@ -389,13 +411,19 @@ export const App = () => {
     } else {
       window.localStorage.removeItem(STORAGE_KEYS.revocations);
     }
+    if (auditLogJson) {
+      window.localStorage.setItem(STORAGE_KEYS.auditLog, auditLogJson);
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.auditLog);
+    }
 
     void saveSecurityStateCommand({
       identityJson,
       delegationJson,
-      revocationQueueJson
+      revocationQueueJson,
+      auditLogJson
     });
-  }, [delegation, identity, revocationQueue, securityHydrated]);
+  }, [auditLog, delegation, identity, revocationQueue, securityHydrated]);
 
   useEffect(() => {
     if (activeTab === "alerts" && unreadAlerts > 0) {
@@ -414,6 +442,7 @@ export const App = () => {
     const entry = createOfflineRevocationEntry(delegation.revocationId, "auto revoke on expiry", timeTick);
     setRevocationQueue((current) => enqueueOfflineRevocation(current, entry));
     setDelegation(null);
+    recordSecurityEvent("ucan.expired", `delegation expired for ${formatDidHandle(delegation.audienceDid)}`);
     setActionNote("UCAN expired and was queued for revocation replay.");
   }, [delegation, timeTick]);
 
@@ -479,6 +508,7 @@ export const App = () => {
     setIdentity(null);
     setDelegation(null);
     setRevocationQueue([]);
+    setAuditLog([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
     window.localStorage.removeItem(STORAGE_KEYS.posts);
     window.localStorage.removeItem(STORAGE_KEYS.follows);
@@ -487,6 +517,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.identity);
     window.localStorage.removeItem(STORAGE_KEYS.ucan);
     window.localStorage.removeItem(STORAGE_KEYS.revocations);
+    window.localStorage.removeItem(STORAGE_KEYS.auditLog);
     setActionNote("Demo state reset.");
   };
 
@@ -727,12 +758,29 @@ export const App = () => {
                   Expires: {new Date(delegation.expiresAt).toLocaleString()} · Revocations queued: {revocationQueue.length}
                 </p>
               )}
+              <div className="alerts-panel">
+                <h3>Security Audit</h3>
+                <div className="alerts-list">
+                  {auditLog.slice(0, 5).map((entry) => (
+                    <div className="alert-row" key={entry.id}>
+                      <span>{entry.event}</span>
+                      <span className="muted">{new Date(entry.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                  ))}
+                  {auditLog.length === 0 && (
+                    <div className="alert-row">
+                      <span className="muted">No security actions recorded yet.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="profile-actions">
                 <button
                   className="follow secondary"
                   onClick={() => {
                     const nextIdentity = createIdentityRecord();
                     setIdentity(nextIdentity);
+                    recordSecurityEvent("identity.created", `did issued ${formatDidHandle(nextIdentity.did)}`);
                     setActionNote(`Identity created: ${formatDidHandle(nextIdentity.did)}`);
                   }}
                 >
@@ -743,6 +791,7 @@ export const App = () => {
                   onClick={() => {
                     setIdentity(null);
                     setDelegation(null);
+                    recordSecurityEvent("identity.cleared", "identity and delegation cleared");
                     setActionNote("Identity cleared.");
                   }}
                 >
@@ -763,6 +812,7 @@ export const App = () => {
                       ttlSeconds: 3600
                     });
                     setDelegation(nextDelegation);
+                    recordSecurityEvent("ucan.created", `delegated publish to ${formatDidHandle(audience)}`);
                     setActionNote(`UCAN delegated to ${formatDidHandle(audience)}.`);
                   }}
                 >
@@ -781,6 +831,7 @@ export const App = () => {
                     );
                     setRevocationQueue((current) => enqueueOfflineRevocation(current, entry));
                     setDelegation(null);
+                    recordSecurityEvent("ucan.revoked", `queued revoke for ${formatDidHandle(delegation.audienceDid)}`);
                     setActionNote("UCAN revoked and queued for offline replay.");
                   }}
                 >
@@ -799,6 +850,7 @@ export const App = () => {
                     );
                     if (!flushed) {
                       setRevocationQueue(result.remaining);
+                      recordSecurityEvent("revocation.replayed", `replayed ${result.replayed.length} queued revoke(s)`);
                       setActionNote(`Replayed ${result.replayed.length} queued revocation(s).`);
                       return;
                     }
@@ -806,6 +858,7 @@ export const App = () => {
                     setRevocationQueue((current) =>
                       current.filter((entry) => !flushedSet.has(entry.revocationId))
                     );
+                    recordSecurityEvent("revocation.replayed", `flushed ${flushed.flushedIds.length} revoke(s) via tauri`);
                     setActionNote(`Flushed ${flushed.flushedIds.length} revocation(s) via Tauri command.`);
                   })()}
                 >

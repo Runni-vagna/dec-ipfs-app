@@ -40,6 +40,19 @@ export type RevocationReplayResult = {
   readonly replayed: OfflineRevocationEntry[];
   readonly remaining: OfflineRevocationEntry[];
 };
+export type SecurityAuditEventType =
+  | "identity.created"
+  | "identity.cleared"
+  | "ucan.created"
+  | "ucan.revoked"
+  | "ucan.expired"
+  | "revocation.replayed";
+export type SecurityAuditEntry = {
+  readonly id: string;
+  readonly event: SecurityAuditEventType;
+  readonly detail: string;
+  readonly timestamp: number;
+};
 
 export const createFeedEntry = (postCID: string, timestamp = Date.now()): FeedEntry => {
   if (postCID.trim().length === 0) {
@@ -616,4 +629,80 @@ export const replayOfflineRevocations = (
     replayed,
     remaining
   };
+};
+
+export const createSecurityAuditEntry = (
+  event: SecurityAuditEventType,
+  detail: string,
+  timestamp = Date.now()
+): SecurityAuditEntry => {
+  const normalizedDetail = detail.trim();
+  if (normalizedDetail.length === 0) {
+    throw new Error("detail must be non-empty");
+  }
+  return {
+    id: `audit-${timestamp.toString(36)}-${encodeBase58(randomBytes(6))}`,
+    event,
+    detail: normalizedDetail,
+    timestamp
+  };
+};
+
+export const appendSecurityAuditEntry = (
+  current: readonly SecurityAuditEntry[],
+  entry: SecurityAuditEntry,
+  maxEntries = 100
+): SecurityAuditEntry[] => {
+  const next = [entry, ...current];
+  const safeMax = Number.isFinite(maxEntries) && maxEntries > 0 ? Math.floor(maxEntries) : 100;
+  return next.slice(0, safeMax);
+};
+
+export const serializeSecurityAuditLog = (entries: readonly SecurityAuditEntry[]): string => {
+  return JSON.stringify(entries);
+};
+
+export const parseSecurityAuditLog = (raw: string | null | undefined): SecurityAuditEntry[] => {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  const entries: SecurityAuditEntry[] = [];
+  for (const item of parsed) {
+    if (!isObject(item)) {
+      continue;
+    }
+    const id = typeof item.id === "string" ? item.id.trim() : "";
+    const event = typeof item.event === "string" ? item.event : "";
+    const detail = typeof item.detail === "string" ? item.detail.trim() : "";
+    const timestamp = typeof item.timestamp === "number" ? item.timestamp : NaN;
+    if (id.length === 0 || detail.length === 0 || !Number.isFinite(timestamp)) {
+      continue;
+    }
+    if (
+      event !== "identity.created" &&
+      event !== "identity.cleared" &&
+      event !== "ucan.created" &&
+      event !== "ucan.revoked" &&
+      event !== "ucan.expired" &&
+      event !== "revocation.replayed"
+    ) {
+      continue;
+    }
+    entries.push({
+      id,
+      event,
+      detail,
+      timestamp
+    });
+  }
+  return entries;
 };

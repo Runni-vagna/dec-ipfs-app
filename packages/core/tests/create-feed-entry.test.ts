@@ -7,8 +7,10 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  appendSecurityAuditEntry,
   createOfflineRevocationEntry,
   createRevocationId,
+  createSecurityAuditEntry,
   createUcanDelegation,
   createIdentityRecord,
   createFeedStateSnapshot,
@@ -24,6 +26,7 @@ import {
   isUcanDelegationExpired,
   isValidDidKey,
   parseOfflineRevocationQueue,
+  parseSecurityAuditLog,
   replayOfflineRevocations,
   parseIdentityRecord,
   parseActiveTab,
@@ -33,6 +36,7 @@ import {
   removeFeedPost,
   restoreFeedPost,
   serializeOfflineRevocationQueue,
+  serializeSecurityAuditLog,
   serializeIdentityRecord,
   serializeUcanDelegation,
   serializeFeedStateSnapshot,
@@ -288,5 +292,24 @@ describe("ucan and revocation helpers", () => {
     const full = replayOfflineRevocations(partial.remaining, 10);
     expect(full.replayed).toHaveLength(1);
     expect(full.remaining).toHaveLength(0);
+  });
+});
+
+describe("security audit log helpers", () => {
+  it("creates and appends audit entries with max cap", () => {
+    const one = createSecurityAuditEntry("identity.created", "created did", 10);
+    const two = createSecurityAuditEntry("ucan.created", "created ucan", 20);
+    const entries = appendSecurityAuditEntry([one], two, 1);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.event).toBe("ucan.created");
+  });
+
+  it("serializes and parses audit entries safely", () => {
+    const entry = createSecurityAuditEntry("revocation.replayed", "flushed queue", 30);
+    const raw = serializeSecurityAuditLog([entry]);
+    const parsed = parseSecurityAuditLog(raw);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.event).toBe("revocation.replayed");
+    expect(parseSecurityAuditLog("bad-json")).toHaveLength(0);
   });
 });

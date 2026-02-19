@@ -9,6 +9,7 @@ export type SecurityStatePayload = {
   identityJson: string | null;
   delegationJson: string | null;
   revocationQueueJson: string | null;
+  auditLogJson: string | null;
 };
 
 export type FlushRevocationResult = {
@@ -38,7 +39,8 @@ export const saveSecurityStateCommand = async (payload: SecurityStatePayload): P
   await invokeTauri<void>("set_security_state", {
     identityJson: payload.identityJson,
     delegationJson: payload.delegationJson,
-    revocationQueueJson: payload.revocationQueueJson
+    revocationQueueJson: payload.revocationQueueJson,
+    auditLogJson: payload.auditLogJson
   });
 };
 

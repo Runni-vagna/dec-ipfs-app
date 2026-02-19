@@ -56,6 +56,7 @@ describe("App interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create DID" }));
 
     expect(screen.getByText("Active DID")).toBeTruthy();
+    expect(screen.getByText("identity.created")).toBeTruthy();
   });
 
   it("creates and revokes ucan delegation from profile tools", async () => {

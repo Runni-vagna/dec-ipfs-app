@@ -82,6 +82,11 @@
   - implemented `flush_revocation_queue` command stub in `packages/tauri/src-tauri/src/main.rs`
   - extended UI bridge (`packages/ui/src/tauri-security-state.ts`) with flush command client
   - replay action in `packages/ui/src/App.tsx` now calls Tauri flush in desktop mode and keeps web fallback behavior
+- Added persistent security audit trail:
+  - implemented core audit helpers for create/append/parse/serialize in `packages/core/src/index.ts`
+  - extended Tauri security state payload to persist audit log JSON alongside identity/UCAN/revocation data
+  - wired `packages/ui/src/App.tsx` to record and display security events (`identity.*`, `ucan.*`, `revocation.replayed`) in profile view
+  - expanded tests to validate audit helpers and UI audit rendering (`22` core tests passing; `5` UI tests passing)
 
 ### Phase Tracking
 
