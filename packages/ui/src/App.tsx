@@ -24,6 +24,7 @@ export const App = () => {
   const [isWizardOpen, setWizardOpen] = useState(false);
   const [isComposeOpen, setComposeOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [actionNote, setActionNote] = useState("Ready");
   const [posts, setPosts] = useState<FeedItem[]>([
     { cid: "bafybeigd", body: "CIDFeed content sharing post", tag: "main" },
     { cid: "bafybeih2", body: "Swarm update: private peers online", tag: "private" },
@@ -60,6 +61,7 @@ export const App = () => {
       { cid: `bafy${stamp.slice(0, 5)}`, body: trimmed, tag: activeTab },
       ...current
     ]);
+    setActionNote("Post published to local mock feed.");
     setDraft("");
     setComposeOpen(false);
   };
@@ -75,6 +77,7 @@ export const App = () => {
   return (
     <div className="app-shell">
       <div className="ambient" aria-hidden="true" />
+      <div className="status-pill" aria-live="polite">{actionNote}</div>
       <main className="layout">
         <aside className="glass panel sidebar">
           <div className="brand">CIDFeed</div>
@@ -83,7 +86,10 @@ export const App = () => {
               <button
                 key={item.id}
                 className={activeTab === item.id ? "nav-item active" : "nav-item"}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setActionNote(`Switched to ${item.label}.`);
+                }}
               >
                 {item.icon}
                 {item.label}
@@ -97,6 +103,16 @@ export const App = () => {
           <header className="feed-header">
             <h1>{tabTitle[activeTab]} Feed</h1>
             <div className="header-actions">
+              <button
+                className="icon-btn"
+                aria-label="Compose"
+                onClick={() => {
+                  setComposeOpen(true);
+                  setActionNote("Compose opened.");
+                }}
+              >
+                <Plus size={16} />
+              </button>
               {isSearchOpen && (
                 <input
                   className="search-input"
@@ -109,7 +125,10 @@ export const App = () => {
               <button
                 className="icon-btn"
                 aria-label="Search"
-                onClick={() => setSearchOpen((open) => !open)}
+                onClick={() => {
+                  setSearchOpen((open) => !open);
+                  setActionNote("Search toggled.");
+                }}
               >
                 <Search size={16} />
               </button>
@@ -135,12 +154,14 @@ export const App = () => {
                   </div>
                   <button
                     className={isFollowed ? "follow following" : "follow"}
-                    onClick={() =>
+                    onClick={() => {
+                      const next = !isFollowed;
                       setFollowedCids((current) => ({
                         ...current,
-                        [post.cid]: !current[post.cid]
-                      }))
-                    }
+                        [post.cid]: next
+                      }));
+                      setActionNote(next ? `Following ${post.cid}...` : `Unfollowed ${post.cid}.`);
+                    }}
                   >
                     {isFollowed ? "Following" : "Follow"}
                   </button>
@@ -160,30 +181,61 @@ export const App = () => {
             <span />
             <span />
           </div>
-          <button className="cta" onClick={() => setWizardOpen(true)}>Open Wizard</button>
+          <button
+            className="cta"
+            onClick={() => {
+              setWizardOpen(true);
+              setActionNote("Private wizard opened.");
+            }}
+          >
+            Open Wizard
+          </button>
         </aside>
       </main>
 
       <nav className="mobile-nav glass" aria-label="Mobile nav">
         <button
           className={activeTab === "main" ? "active-mobile" : ""}
-          onClick={() => setActiveTab("main")}
+          onClick={() => {
+            setActiveTab("main");
+            setActionNote("Switched to Main.");
+          }}
         >
           <Home size={17} />
         </button>
-        <button onClick={() => setSearchOpen((open) => !open)}><Search size={17} /></button>
-        <button className="fab" aria-label="Compose" onClick={() => setComposeOpen(true)}>
+        <button
+          onClick={() => {
+            setSearchOpen((open) => !open);
+            setActionNote("Search toggled.");
+          }}
+        >
+          <Search size={17} />
+        </button>
+        <button
+          className="fab"
+          aria-label="Compose"
+          onClick={() => {
+            setComposeOpen(true);
+            setActionNote("Compose opened.");
+          }}
+        >
           <Plus size={20} />
         </button>
         <button
           className={activeTab === "alerts" ? "active-mobile" : ""}
-          onClick={() => setActiveTab("alerts")}
+          onClick={() => {
+            setActiveTab("alerts");
+            setActionNote("Switched to Alerts.");
+          }}
         >
           <Bell size={17} />
         </button>
         <button
           className={activeTab === "profile" ? "active-mobile" : ""}
-          onClick={() => setActiveTab("profile")}
+          onClick={() => {
+            setActiveTab("profile");
+            setActionNote("Switched to Profile.");
+          }}
         >
           <User size={17} />
         </button>
@@ -198,8 +250,24 @@ export const App = () => {
             <h3>Private Node Wizard</h3>
             <p className="muted">Choose onboarding path:</p>
             <div className="wizard-actions">
-              <button className="cta">Easy Mode</button>
-              <button className="follow">Private Swarm</button>
+              <button
+                className="cta"
+                onClick={() => {
+                  setActionNote("Easy Mode selected (mock).");
+                  setWizardOpen(false);
+                }}
+              >
+                Easy Mode
+              </button>
+              <button
+                className="follow"
+                onClick={() => {
+                  setActionNote("Private Swarm selected (mock).");
+                  setWizardOpen(false);
+                }}
+              >
+                Private Swarm
+              </button>
             </div>
           </div>
         </div>

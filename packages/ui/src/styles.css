@@ -36,6 +36,19 @@ button {
   padding: 1rem;
 }
 
+.status-pill {
+  position: fixed;
+  top: 0.9rem;
+  right: 1rem;
+  z-index: 31;
+  border: 1px solid var(--border);
+  background: #0a0e14d1;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  color: #9cefe2;
+}
+
 .ambient {
   position: fixed;
   inset: 0;
@@ -309,6 +322,16 @@ button {
 }
 
 @media (max-width: 1024px) {
+  .status-pill {
+    right: 50%;
+    transform: translateX(50%);
+    top: 0.7rem;
+    max-width: calc(100% - 2rem);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .layout {
     grid-template-columns: 1fr;
     padding-bottom: 5rem;
