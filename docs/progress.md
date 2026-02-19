@@ -61,6 +61,11 @@
   - added offline revocation queue primitives (enqueue + parse/serialize) for reconnect replay flows
   - expanded core tests to cover delegation creation/parsing, expiry behavior, invalid payload handling, and revocation queue behavior (`19` core tests passing)
   - documented security impact in `docs/threat-model.md` under UCAN scaffold status
+- Wired UCAN lifecycle controls into profile UI:
+  - added local persistence state keys for active UCAN delegation + offline revocation queue in `packages/ui/src/App.tsx`
+  - profile actions now support `Create UCAN` (delegation with explicit expiry) and `Revoke UCAN` (enqueue offline revocation entry + clear active delegation)
+  - profile panel now shows UCAN active/expired status, expiry timestamp, and queued revocation count
+  - expanded UI interactions tests to cover UCAN create/revoke flow (`5` UI tests passing)
 
 ### Phase Tracking
 

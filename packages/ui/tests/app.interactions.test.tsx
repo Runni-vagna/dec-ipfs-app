@@ -57,4 +57,16 @@ describe("App interactions", () => {
 
     expect(screen.getByText("Active DID")).toBeTruthy();
   });
+
+  it("creates and revokes ucan delegation from profile tools", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create DID" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create UCAN" }));
+    expect(screen.getByText("UCAN Active")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke UCAN" }));
+    expect(screen.getByText("Delegate Access")).toBeTruthy();
+  });
 });

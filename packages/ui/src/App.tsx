@@ -8,26 +8,36 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Bell, CircleHelp, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
 import {
+  createOfflineRevocationEntry,
   createFeedStateSnapshot,
   createIdentityRecord,
   createResetFeedState,
   createDraftPost,
+  createUcanDelegation,
+  enqueueOfflineRevocation,
   filterFeedPosts,
   formatDidHandle,
+  isUcanDelegationExpired,
+  parseOfflineRevocationQueue,
   parseIdentityRecord,
   parseActiveTab,
+  parseUcanDelegation,
   parseImportedFeedState,
   prependFeedPost,
   removeFeedPost,
   restoreFeedPost,
+  serializeOfflineRevocationQueue,
   serializeIdentityRecord,
+  serializeUcanDelegation,
   serializeFeedStateSnapshot,
   toFeedPost,
   toggleFlag,
   type ActiveTab,
   type FeedPost,
   type IdentityRecord,
-  type RemovedPostSnapshot
+  type OfflineRevocationEntry,
+  type RemovedPostSnapshot,
+  type UcanDelegationRecord
 } from "@cidfeed/core";
 import {
   getPrivateNodeStatus,
@@ -53,7 +63,9 @@ const STORAGE_KEYS = {
   follows: "cidfeed.ui.follows",
   unread: "cidfeed.ui.unreadAlerts",
   pins: "cidfeed.ui.pinnedCids",
-  identity: "cidfeed.ui.identity"
+  identity: "cidfeed.ui.identity",
+  ucan: "cidfeed.ui.ucanDelegation",
+  revocations: "cidfeed.ui.offlineRevocationQueue"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -106,6 +118,18 @@ export const App = () => {
       return null;
     }
     return parseIdentityRecord(window.localStorage.getItem(STORAGE_KEYS.identity));
+  });
+  const [delegation, setDelegation] = useState<UcanDelegationRecord | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    return parseUcanDelegation(window.localStorage.getItem(STORAGE_KEYS.ucan));
+  });
+  const [revocationQueue, setRevocationQueue] = useState<OfflineRevocationEntry[]>(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+    return parseOfflineRevocationQueue(window.localStorage.getItem(STORAGE_KEYS.revocations));
   });
   const [privateNodeOnline, setPrivateNodeOnline] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
@@ -325,6 +349,22 @@ export const App = () => {
   }, [identity]);
 
   useEffect(() => {
+    if (!delegation) {
+      window.localStorage.removeItem(STORAGE_KEYS.ucan);
+      return;
+    }
+    window.localStorage.setItem(STORAGE_KEYS.ucan, serializeUcanDelegation(delegation));
+  }, [delegation]);
+
+  useEffect(() => {
+    if (revocationQueue.length === 0) {
+      window.localStorage.removeItem(STORAGE_KEYS.revocations);
+      return;
+    }
+    window.localStorage.setItem(STORAGE_KEYS.revocations, serializeOfflineRevocationQueue(revocationQueue));
+  }, [revocationQueue]);
+
+  useEffect(() => {
     if (activeTab === "alerts" && unreadAlerts > 0) {
       setUnreadAlerts(0);
       setActionNote("Alerts marked as read.");
@@ -391,12 +431,16 @@ export const App = () => {
     setUnreadAlerts(reset.unreadAlerts);
     setPosts(reset.posts);
     setIdentity(null);
+    setDelegation(null);
+    setRevocationQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
     window.localStorage.removeItem(STORAGE_KEYS.posts);
     window.localStorage.removeItem(STORAGE_KEYS.follows);
     window.localStorage.removeItem(STORAGE_KEYS.unread);
     window.localStorage.removeItem(STORAGE_KEYS.pins);
     window.localStorage.removeItem(STORAGE_KEYS.identity);
+    window.localStorage.removeItem(STORAGE_KEYS.ucan);
+    window.localStorage.removeItem(STORAGE_KEYS.revocations);
     setActionNote("Demo state reset.");
   };
 
@@ -620,6 +664,17 @@ export const App = () => {
                 <span className="muted">{identity ? "Active DID" : "Create Identity"}</span>
               </div>
               {identity && <p className="muted">Created: {new Date(identity.createdAt).toLocaleString()}</p>}
+              <div className="alert-row">
+                <span>{delegation ? formatDidHandle(delegation.audienceDid) : "No UCAN delegation"}</span>
+                <span className="muted">
+                  {delegation ? (isUcanDelegationExpired(delegation) ? "UCAN Expired" : "UCAN Active") : "Delegate Access"}
+                </span>
+              </div>
+              {delegation && (
+                <p className="muted">
+                  Expires: {new Date(delegation.expiresAt).toLocaleString()} · Revocations queued: {revocationQueue.length}
+                </p>
+              )}
               <div className="profile-actions">
                 <button
                   className="follow secondary"
@@ -635,10 +690,49 @@ export const App = () => {
                   className="follow secondary"
                   onClick={() => {
                     setIdentity(null);
+                    setDelegation(null);
                     setActionNote("Identity cleared.");
                   }}
                 >
                   Clear DID
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    if (!identity) {
+                      setActionNote("Create DID first.");
+                      return;
+                    }
+                    const audience = createIdentityRecord().did;
+                    const nextDelegation = createUcanDelegation({
+                      issuerDid: identity.did,
+                      audienceDid: audience,
+                      capabilities: [{ with: identity.did, can: "feed/publish" }],
+                      ttlSeconds: 3600
+                    });
+                    setDelegation(nextDelegation);
+                    setActionNote(`UCAN delegated to ${formatDidHandle(audience)}.`);
+                  }}
+                >
+                  Create UCAN
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    if (!delegation) {
+                      setActionNote("No active UCAN to revoke.");
+                      return;
+                    }
+                    const entry = createOfflineRevocationEntry(
+                      delegation.revocationId,
+                      "manual profile revoke"
+                    );
+                    setRevocationQueue((current) => enqueueOfflineRevocation(current, entry));
+                    setDelegation(null);
+                    setActionNote("UCAN revoked and queued for offline replay.");
+                  }}
+                >
+                  Revoke UCAN
                 </button>
                 <button className="follow secondary" onClick={resetDemoState}>Reset Demo Data</button>
                 <button className="follow secondary" onClick={exportDemoState}>
