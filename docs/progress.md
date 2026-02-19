@@ -48,6 +48,10 @@
   - `packages/tauri/src-tauri/src/main.rs` now loads initial private-node state from app data (`private-node-state.json`)
   - start/stop/peer-join commands persist updated state to disk after each mutation
   - app startup restores previous node online/peer count values for UI status sync
+- Wired wizard onboarding modes to real Tauri command paths:
+  - added `start_private_node_mode` command in `packages/tauri/src-tauri/src/main.rs` with strict mode validation (`easy`/`private`)
+  - extended `packages/ui/src/tauri-private-node.ts` with mode-aware invoke helper
+  - updated wizard "Quick Start" and "Finish & Start Node" in `packages/ui/src/App.tsx` to call mode-specific node start command with web fallback
 
 ### Phase Tracking
 

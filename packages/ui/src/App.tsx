@@ -28,7 +28,9 @@ import {
   getPrivateNodeStatus,
   simulatePeerJoinCommand,
   startPrivateNodeCommand,
+  startPrivateNodeWithModeCommand,
   stopPrivateNodeCommand,
+  type NodeStartMode,
   type PrivateNodeStatus
 } from "./tauri-private-node";
 
@@ -188,6 +190,20 @@ export const App = () => {
     setWizardStep(1);
     setWizardOpen(true);
     setActionNote("Private wizard opened.");
+  };
+
+  const startNodeFromWizard = async (mode: NodeStartMode) => {
+    const status = await startPrivateNodeWithModeCommand(mode);
+    if (status) {
+      applyPrivateNodeStatus(status);
+      setWizardOpen(false);
+      setActionNote(`Wizard complete. ${mode === "private" ? "Private" : "Easy"} node started.`);
+      return;
+    }
+    setPrivateNodeOnline(true);
+    setPeerCount(mode === "private" ? 2 : 4);
+    setWizardOpen(false);
+    setActionNote(`Wizard complete. ${mode === "private" ? "Private" : "Easy"} node started (web fallback).`);
   };
 
   const applyPrivateNodeStatus = (status: PrivateNodeStatus) => {
@@ -696,10 +712,7 @@ export const App = () => {
             <div className="wizard-actions">
               <button
                 className="cta"
-                onClick={() => {
-                  setActionNote("Easy Mode selected (mock).");
-                  setWizardOpen(false);
-                }}
+                onClick={() => void startNodeFromWizard("easy")}
               >
                 Quick Start
               </button>
@@ -739,12 +752,7 @@ export const App = () => {
                 <p className="muted">Configuration generated (mock). You can now start the node.</p>
                 <button
                   className="cta"
-                  onClick={() => {
-                    setPrivateNodeOnline(true);
-                    setPeerCount(wizardMode === "private" ? 2 : 4);
-                    setWizardOpen(false);
-                    setActionNote("Wizard complete. Node started.");
-                  }}
+                  onClick={() => void startNodeFromWizard(wizardMode === "private" ? "private" : "easy")}
                 >
                   Finish & Start Node
                 </button>

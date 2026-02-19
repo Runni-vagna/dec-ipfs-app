@@ -81,6 +81,24 @@ fn start_private_node(state: State<'_, AppState>) -> PrivateNodeStatus {
 }
 
 #[tauri::command]
+fn start_private_node_mode(
+    state: State<'_, AppState>,
+    mode: String,
+) -> Result<PrivateNodeStatus, String> {
+    let peer_count = match mode.as_str() {
+        "easy" => 4,
+        "private" => 2,
+        _ => return Err("invalid node mode".to_string()),
+    };
+
+    let mut guard = state.private_node.lock().expect("private node mutex poisoned");
+    guard.online = true;
+    guard.peer_count = peer_count;
+    persist_private_node_state(&state.private_node_state_path, &guard);
+    Ok(to_status(&guard))
+}
+
+#[tauri::command]
 fn stop_private_node(state: State<'_, AppState>) -> PrivateNodeStatus {
     let mut guard = state.private_node.lock().expect("private node mutex poisoned");
     guard.online = false;
@@ -113,6 +131,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             node_status,
             start_private_node,
+            start_private_node_mode,
             stop_private_node,
             simulate_peer_join
         ])
