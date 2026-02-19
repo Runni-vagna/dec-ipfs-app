@@ -5,7 +5,7 @@
  * Immutability: CIDs are permanent
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Bell, Compass, Home, Plus, Search, Shield, User, X } from "lucide-react";
 
 type Tab = "main" | "discover" | "private" | "alerts" | "profile";
@@ -19,7 +19,8 @@ type FeedItem = {
 const STORAGE_KEYS = {
   tab: "cidfeed.ui.activeTab",
   posts: "cidfeed.ui.posts",
-  follows: "cidfeed.ui.follows"
+  follows: "cidfeed.ui.follows",
+  unread: "cidfeed.ui.unreadAlerts"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -45,6 +46,7 @@ export const App = () => {
   });
   const [isSearchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [followedCids, setFollowedCids] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") {
       return {};
@@ -60,6 +62,13 @@ export const App = () => {
   const [isComposeOpen, setComposeOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [actionNote, setActionNote] = useState("Ready");
+  const [unreadAlerts, setUnreadAlerts] = useState<number>(() => {
+    if (typeof window === "undefined") {
+      return 2;
+    }
+    const raw = window.localStorage.getItem(STORAGE_KEYS.unread);
+    return raw ? Number(raw) || 0 : 2;
+  });
   const [posts, setPosts] = useState<FeedItem[]>(() => {
     if (typeof window === "undefined") {
       return DEFAULT_POSTS;
@@ -101,6 +110,9 @@ export const App = () => {
       { cid: `bafy${stamp.slice(0, 5)}`, body: trimmed, tag: activeTab },
       ...current
     ]);
+    if (activeTab !== "alerts") {
+      setUnreadAlerts((count) => count + 1);
+    }
     setActionNote("Post published to local mock feed.");
     setDraft("");
     setComposeOpen(false);
@@ -127,7 +139,31 @@ export const App = () => {
   }, [followedCids]);
 
   useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.unread, String(unreadAlerts));
+  }, [unreadAlerts]);
+
+  useEffect(() => {
+    if (activeTab === "alerts" && unreadAlerts > 0) {
+      setUnreadAlerts(0);
+      setActionNote("Alerts marked as read.");
+    }
+  }, [activeTab, unreadAlerts]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const inFormField = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA";
+      if (!inFormField && event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        setComposeOpen(true);
+        setActionNote("Compose opened (shortcut: C).");
+      }
+      if (!inFormField && event.key === "/") {
+        event.preventDefault();
+        setSearchOpen(true);
+        setActionNote("Search opened (shortcut: /).");
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      }
       if (event.key === "Escape") {
         setWizardOpen(false);
         setComposeOpen(false);
@@ -136,6 +172,23 @@ export const App = () => {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  const resetDemoState = () => {
+    setActiveTab("main");
+    setSearchOpen(false);
+    setQuery("");
+    setFollowedCids({});
+    setWizardOpen(false);
+    setComposeOpen(false);
+    setDraft("");
+    setUnreadAlerts(0);
+    setPosts(DEFAULT_POSTS);
+    window.localStorage.removeItem(STORAGE_KEYS.tab);
+    window.localStorage.removeItem(STORAGE_KEYS.posts);
+    window.localStorage.removeItem(STORAGE_KEYS.follows);
+    window.localStorage.removeItem(STORAGE_KEYS.unread);
+    setActionNote("Demo state reset.");
+  };
 
   return (
     <div className="app-shell">
@@ -156,6 +209,7 @@ export const App = () => {
               >
                 {item.icon}
                 {item.label}
+                {item.id === "alerts" && unreadAlerts > 0 && <span className="badge">{unreadAlerts}</span>}
               </button>
             ))}
           </nav>
@@ -178,6 +232,7 @@ export const App = () => {
               </button>
               {isSearchOpen && (
                 <input
+                  ref={searchInputRef}
                   className="search-input"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
@@ -235,24 +290,34 @@ export const App = () => {
         </section>
 
         <aside className="glass panel right-rail">
-          <h2>Private Node</h2>
-          <p className="muted">Easy Mode and one-click private swarm wizard are both available.</p>
-          <div className="network-map" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-          <button
-            className="cta"
-            onClick={() => {
-              setWizardOpen(true);
-              setActionNote("Private wizard opened.");
-            }}
-          >
-            Open Wizard
-          </button>
+          {activeTab !== "profile" ? (
+            <>
+              <h2>Private Node</h2>
+              <p className="muted">Easy Mode and one-click private swarm wizard are both available.</p>
+              <div className="network-map" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              <button
+                className="cta"
+                onClick={() => {
+                  setWizardOpen(true);
+                  setActionNote("Private wizard opened.");
+                }}
+              >
+                Open Wizard
+              </button>
+            </>
+          ) : (
+            <>
+              <h2>Profile Tools</h2>
+              <p className="muted">Quick maintenance actions for your local demo state.</p>
+              <button className="follow secondary" onClick={resetDemoState}>Reset Demo Data</button>
+            </>
+          )}
         </aside>
       </main>
 
@@ -288,10 +353,12 @@ export const App = () => {
           className={activeTab === "alerts" ? "active-mobile" : ""}
           onClick={() => {
             setActiveTab("alerts");
+            setUnreadAlerts(0);
             setActionNote("Switched to Alerts.");
           }}
         >
           <Bell size={17} />
+          {unreadAlerts > 0 && <span className="badge mobile-badge">{unreadAlerts}</span>}
         </button>
         <button
           className={activeTab === "profile" ? "active-mobile" : ""}
