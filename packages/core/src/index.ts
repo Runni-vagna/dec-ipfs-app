@@ -44,6 +44,8 @@ export type RevocationListEntry = {
 export type RevocationListRecord = {
   readonly version: "1.1";
   readonly updatedAt: number;
+  readonly issuerDid: string | null;
+  readonly signature: string | null;
   readonly entries: RevocationListEntry[];
 };
 export type RevocationReplayResult = {
@@ -64,6 +66,7 @@ export type SecurityAuditEventType =
   | "ucan.revoked"
   | "ucan.expired"
   | "ucan.verified"
+  | "revocation.verified"
   | "revocation.replayed";
 export type SecurityAuditEntry = {
   readonly id: string;
@@ -653,6 +656,8 @@ export const createRevocationList = (updatedAt = Date.now()): RevocationListReco
   return {
     version: "1.1",
     updatedAt,
+    issuerDid: null,
+    signature: null,
     entries: []
   };
 };
@@ -675,10 +680,49 @@ export const addRevocationListEntry = (
   return {
     version: "1.1",
     updatedAt: revokedAt,
+    issuerDid: list.issuerDid,
+    signature: null,
     entries: [...existing, { revocationId: normalizedId, revokedAt, reason: normalizedReason }].sort(
       (left, right) => right.revokedAt - left.revokedAt
     )
   };
+};
+
+const createRevocationListSigningPayload = (list: RevocationListRecord, issuerDid: string): string => {
+  const entries = [...list.entries].sort((left, right) => right.revokedAt - left.revokedAt);
+  return JSON.stringify({
+    version: "1.1",
+    updatedAt: list.updatedAt,
+    issuerDid,
+    entries
+  });
+};
+
+export const signRevocationList = (list: RevocationListRecord, issuerDid: string): RevocationListRecord => {
+  const normalizedIssuer = issuerDid.trim();
+  if (!isValidDidKey(normalizedIssuer)) {
+    throw new Error("issuerDid must be a valid did:key identifier");
+  }
+  const payload = createRevocationListSigningPayload(list, normalizedIssuer);
+  const signature = `sig-${fnv1aHex(payload)}`;
+  return {
+    version: "1.1",
+    updatedAt: list.updatedAt,
+    issuerDid: normalizedIssuer,
+    signature,
+    entries: [...list.entries].sort((left, right) => right.revokedAt - left.revokedAt)
+  };
+};
+
+export const verifyRevocationListSignature = (list: RevocationListRecord): boolean => {
+  if (list.entries.length === 0) {
+    return true;
+  }
+  if (!list.issuerDid || !list.signature || !isValidDidKey(list.issuerDid)) {
+    return false;
+  }
+  const expected = `sig-${fnv1aHex(createRevocationListSigningPayload(list, list.issuerDid))}`;
+  return expected === list.signature;
 };
 
 export const serializeRevocationList = (list: RevocationListRecord): string => {
@@ -700,8 +744,15 @@ export const parseRevocationList = (raw: string | null | undefined): RevocationL
   }
   const version = parsed.version;
   const updatedAt = typeof parsed.updatedAt === "number" ? parsed.updatedAt : NaN;
+  const issuerDidRaw = typeof parsed.issuerDid === "string" ? parsed.issuerDid.trim() : "";
+  const issuerDid = issuerDidRaw.length > 0 ? issuerDidRaw : null;
+  const signatureRaw = typeof parsed.signature === "string" ? parsed.signature.trim() : "";
+  const signature = signatureRaw.length > 0 ? signatureRaw : null;
   const entriesRaw = Array.isArray(parsed.entries) ? parsed.entries : [];
   if (version !== "1.1" || !Number.isFinite(updatedAt)) {
+    return createRevocationList();
+  }
+  if (issuerDid && !isValidDidKey(issuerDid)) {
     return createRevocationList();
   }
   const entries: RevocationListEntry[] = [];
@@ -720,6 +771,8 @@ export const parseRevocationList = (raw: string | null | undefined): RevocationL
   return {
     version: "1.1",
     updatedAt,
+    issuerDid,
+    signature,
     entries: entries.sort((left, right) => right.revokedAt - left.revokedAt)
   };
 };
@@ -938,6 +991,7 @@ export const parseSecurityAuditLog = (raw: string | null | undefined): SecurityA
       event !== "ucan.revoked" &&
       event !== "ucan.expired" &&
       event !== "ucan.verified" &&
+      event !== "revocation.verified" &&
       event !== "revocation.replayed"
     ) {
       continue;

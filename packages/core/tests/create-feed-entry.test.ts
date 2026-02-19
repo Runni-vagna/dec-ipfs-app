@@ -50,7 +50,9 @@ import {
   splitReadyFailedRetries,
   toFeedPost,
   toggleFlag,
+  signRevocationList,
   upsertFailedRevocationRetries,
+  verifyRevocationListSignature,
   verifyDelegationRevocation
 } from "../src";
 
@@ -335,6 +337,28 @@ describe("ucan and revocation helpers", () => {
     expect(parsed.entries).toHaveLength(0);
     expect(parseRevocationList("bad-json").entries).toHaveLength(0);
   });
+
+  it("signs and verifies revocation list integrity", () => {
+    const unsigned = parseRevocationList(
+      JSON.stringify({
+        version: "1.1",
+        updatedAt: 1700000020000,
+        entries: [{ revocationId: "revoke-1", revokedAt: 1700000020000, reason: "manual revoke" }]
+      })
+    );
+    expect(verifyRevocationListSignature(unsigned)).toBe(false);
+
+    const signed = signRevocationList(unsigned, issuer);
+    expect(verifyRevocationListSignature(signed)).toBe(true);
+
+    const tampered = parseRevocationList(
+      JSON.stringify({
+        ...signed,
+        entries: [...signed.entries, { revocationId: "revoke-2", revokedAt: 1700000021000, reason: "tamper" }]
+      })
+    );
+    expect(verifyRevocationListSignature(tampered)).toBe(false);
+  });
 });
 
 describe("security audit log helpers", () => {
@@ -348,10 +372,12 @@ describe("security audit log helpers", () => {
 
   it("serializes and parses audit entries safely", () => {
     const entry = createSecurityAuditEntry("revocation.replayed", "flushed queue", 30);
-    const raw = serializeSecurityAuditLog([entry]);
+    const verification = createSecurityAuditEntry("revocation.verified", "integrity ok", 31);
+    const raw = serializeSecurityAuditLog([entry, verification]);
     const parsed = parseSecurityAuditLog(raw);
-    expect(parsed).toHaveLength(1);
+    expect(parsed).toHaveLength(2);
     expect(parsed[0]?.event).toBe("revocation.replayed");
+    expect(parsed[1]?.event).toBe("revocation.verified");
     expect(parseSecurityAuditLog("bad-json")).toHaveLength(0);
   });
 });

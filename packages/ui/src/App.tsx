@@ -33,6 +33,7 @@ import {
   parseSecurityAuditLog,
   replayOfflineRevocations,
   removeFailedRetries,
+  signRevocationList,
   prependFeedPost,
   splitReadyFailedRetries,
   removeFeedPost,
@@ -56,6 +57,7 @@ import {
   type SecurityAuditEntry,
   type UcanDelegationRecord,
   upsertFailedRevocationRetries,
+  verifyRevocationListSignature,
   verifyDelegationRevocation
 } from "@cidfeed/core";
 import {
@@ -193,6 +195,7 @@ export const App = () => {
       | "ucan.revoked"
       | "ucan.expired"
       | "ucan.verified"
+      | "revocation.verified"
       | "revocation.replayed",
     detail: string
   ) => {
@@ -258,6 +261,7 @@ export const App = () => {
     }
     return verifyDelegationRevocation(delegation, revocationList, timeTick);
   }, [delegation, revocationList, timeTick]);
+  const revocationListIntegrity = useMemo(() => verifyRevocationListSignature(revocationList), [revocationList]);
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -873,9 +877,14 @@ export const App = () => {
                 </span>
               </div>
               {delegation && (
-                <p className="muted">
-                  Expires: {new Date(delegation.expiresAt).toLocaleString()} · Revocations queued: {revocationQueue.length} · Revocation list: {revocationList.entries.length} · Failed flush retries: {failedFlushQueue.length}
-                </p>
+                <>
+                  <p className="muted">
+                    Expires: {new Date(delegation.expiresAt).toLocaleString()} · Revocations queued: {revocationQueue.length} · Revocation list: {revocationList.entries.length} · Failed flush retries: {failedFlushQueue.length}
+                  </p>
+                  <p className="muted">
+                    Revocation list integrity: {revocationListIntegrity ? "Verified" : "Unverified"}
+                  </p>
+                </>
               )}
               <div className="alerts-panel">
                 <h3>Security Audit</h3>
@@ -1069,6 +1078,33 @@ export const App = () => {
                   })()}
                 >
                   Replay Revocations
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    if (!identity) {
+                      setActionNote("Create DID first to sign revocation list.");
+                      return;
+                    }
+                    setRevocationList((current) => signRevocationList(current, identity.did));
+                    recordSecurityEvent("revocation.verified", "revocation list signed");
+                    setActionNote("Revocation list signed.");
+                  }}
+                >
+                  Sign Revocation List
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    const verified = verifyRevocationListSignature(revocationList);
+                    recordSecurityEvent(
+                      "revocation.verified",
+                      `revocation list integrity ${verified ? "verified" : "failed"}`
+                    );
+                    setActionNote(`Revocation list integrity ${verified ? "verified" : "failed"}.`);
+                  }}
+                >
+                  Verify Revocation List
                 </button>
                 <button
                   className="follow secondary"

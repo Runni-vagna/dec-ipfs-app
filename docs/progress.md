@@ -124,6 +124,12 @@
   - `packages/ui/src/App.tsx` now blocks publishing when delegation verification resolves to `revoked` or `expired`
   - blocked publish path records `ucan.verified` audit event and user-facing status message
   - added UI test for revoked publish block in `packages/ui/tests/app.interactions.test.tsx`
+- Added revocation-list integrity signing scaffolding:
+  - extended core revocation-list schema with `issuerDid` and `signature` in `packages/core/src/index.ts`
+  - added core helpers `signRevocationList` and `verifyRevocationListSignature`
+  - added core tests for signed/tampered revocation-list verification behavior
+  - profile UI now shows revocation-list integrity state and includes `Sign Revocation List` / `Verify Revocation List` actions
+  - added UI test that signs an unverified list and verifies status changes to `Verified`
 
 ### Phase Tracking
 

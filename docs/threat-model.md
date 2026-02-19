@@ -35,3 +35,4 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Revocation-list verification path now exists in core (`active`/`expired`/`revoked`) and is surfaced in UI profile status.
 - Revocation list state is persisted via Tauri security-state bridge for offline integrity checks.
 - Compose publish flow now blocks when delegation verification returns `revoked` or `expired`.
+- Revocation-list signing and integrity verification scaffolding added (`issuerDid` + deterministic signature check) with profile controls to sign/verify list state.
