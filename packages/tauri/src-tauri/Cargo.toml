@@ -1,0 +1,20 @@
+[package]
+name = "cidfeed"
+version = "0.1.0"
+description = "CIDFeed Tauri shell"
+authors = ["CIDFeed"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2.0.1", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.6", features = [] }
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.133"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

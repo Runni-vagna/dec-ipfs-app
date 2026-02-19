@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CIDFeed",
+  "version": "0.1.0",
+  "identifier": "app.cidfeed.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @cidfeed/ui dev",
+    "beforeBuildCommand": "pnpm --filter @cidfeed/ui build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../../ui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "CIDFeed",
+        "width": 1320,
+        "height": 860,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "all"
+  }
+}
