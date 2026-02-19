@@ -191,6 +191,11 @@ button {
   place-items: center;
 }
 
+.icon-btn.pinned-active {
+  border-color: #00f5d4;
+  box-shadow: 0 0 14px #00f5d460;
+}
+
 .timeline {
   display: flex;
   flex-direction: column;
@@ -266,6 +271,10 @@ button {
   flex-direction: column;
   gap: 0.55rem;
   margin-top: 0.65rem;
+}
+
+.hidden-file {
+  display: none;
 }
 
 .alerts-panel {

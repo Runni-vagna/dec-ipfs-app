@@ -5,8 +5,8 @@
  * Immutability: CIDs are permanent
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Bell, Compass, Download, Home, Plus, Search, Shield, Trash2, User, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { Bell, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
 
 type Tab = "main" | "discover" | "private" | "alerts" | "profile";
 
@@ -44,6 +44,7 @@ const parseTab = (value: string | null): Tab => {
 };
 
 export const App = () => {
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (typeof window === "undefined") {
       return "main";
@@ -78,6 +79,7 @@ export const App = () => {
   const [isWizardOpen, setWizardOpen] = useState(false);
   const [isComposeOpen, setComposeOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [pinnedOnly, setPinnedOnly] = useState(false);
   const [actionNote, setActionNote] = useState("Ready");
   const [lastRemoved, setLastRemoved] = useState<RemovedSnapshot | null>(null);
   const [unreadAlerts, setUnreadAlerts] = useState<number>(() => {
@@ -101,14 +103,15 @@ export const App = () => {
 
   const filteredPosts = useMemo(() => {
     const tabFiltered = posts.filter((post) => post.tag === activeTab || post.tag === "all");
+    const pinFiltered = pinnedOnly ? tabFiltered.filter((post) => pinnedCids[post.cid] === true) : tabFiltered;
     const lowered = query.trim().toLowerCase();
     if (lowered.length === 0) {
-      return tabFiltered;
+      return pinFiltered;
     }
-    return tabFiltered.filter(
+    return pinFiltered.filter(
       (post) => post.cid.toLowerCase().includes(lowered) || post.body.toLowerCase().includes(lowered)
     );
-  }, [activeTab, posts, query]);
+  }, [activeTab, pinnedOnly, pinnedCids, posts, query]);
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -183,6 +186,34 @@ export const App = () => {
     anchor.click();
     window.URL.revokeObjectURL(url);
     setActionNote("Demo state exported.");
+  };
+
+  const importDemoState = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text) as {
+        activeTab?: string;
+        unreadAlerts?: number;
+        followedCids?: Record<string, boolean>;
+        pinnedCids?: Record<string, boolean>;
+        posts?: FeedItem[];
+      };
+      setActiveTab(parseTab(payload.activeTab ?? "main"));
+      setUnreadAlerts(typeof payload.unreadAlerts === "number" ? Math.max(0, payload.unreadAlerts) : 0);
+      setFollowedCids(payload.followedCids ?? {});
+      setPinnedCids(payload.pinnedCids ?? {});
+      setPosts(Array.isArray(payload.posts) && payload.posts.length > 0 ? payload.posts : DEFAULT_POSTS);
+      setPinnedOnly(false);
+      setActionNote("Demo state imported.");
+    } catch {
+      setActionNote("Import failed: invalid JSON.");
+    } finally {
+      event.target.value = "";
+    }
   };
 
   const tabTitle: Record<Tab, string> = {
@@ -346,6 +377,16 @@ export const App = () => {
               >
                 <Search size={16} />
               </button>
+              <button
+                className={pinnedOnly ? "icon-btn pinned-active" : "icon-btn"}
+                aria-label="Toggle pinned filter"
+                onClick={() => {
+                  setPinnedOnly((value) => !value);
+                  setActionNote(!pinnedOnly ? "Pinned-only filter enabled." : "Pinned-only filter disabled.");
+                }}
+              >
+                <Shield size={16} />
+              </button>
             </div>
           </header>
           <div className="timeline" role="list">
@@ -436,6 +477,20 @@ export const App = () => {
                   <Download size={14} />
                   Export Demo State
                 </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => importInputRef.current?.click()}
+                >
+                  <Upload size={14} />
+                  Import Demo State
+                </button>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept="application/json"
+                  className="hidden-file"
+                  onChange={importDemoState}
+                />
               </div>
             </>
           )}
