@@ -87,6 +87,10 @@
   - extended Tauri security state payload to persist audit log JSON alongside identity/UCAN/revocation data
   - wired `packages/ui/src/App.tsx` to record and display security events (`identity.*`, `ucan.*`, `revocation.replayed`) in profile view
   - expanded tests to validate audit helpers and UI audit rendering (`22` core tests passing; `5` UI tests passing)
+- Added audit-log management UX in profile:
+  - security audit panel now supports filters (`All`, `Identity`, `UCAN`, `Revocations`)
+  - added `Export Audit` and `Clear Audit` actions in profile tools
+  - expanded UI tests for audit clearing flow (`6` UI tests passing)
 
 ### Phase Tracking
 

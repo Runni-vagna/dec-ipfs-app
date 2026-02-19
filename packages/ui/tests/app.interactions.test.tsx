@@ -73,4 +73,16 @@ describe("App interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
     expect(await screen.findByText(/Replayed 1 queued revocation\(s\)\./i)).toBeTruthy();
   });
+
+  it("clears security audit entries from profile tools", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create DID" }));
+    expect(screen.getByText("identity.created")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear Audit" }));
+    expect(screen.queryByText("identity.created")).toBeNull();
+    expect(screen.getByText("No security actions recorded yet.")).toBeTruthy();
+  });
 });

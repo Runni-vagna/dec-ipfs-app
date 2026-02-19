@@ -62,6 +62,7 @@ import {
 } from "./tauri-security-state";
 
 type Tab = ActiveTab;
+type AuditFilter = "all" | "identity" | "ucan" | "revocation";
 
 type FeedItem = FeedPost;
 
@@ -150,6 +151,7 @@ export const App = () => {
     }
     return parseSecurityAuditLog(window.localStorage.getItem(STORAGE_KEYS.auditLog));
   });
+  const [auditFilter, setAuditFilter] = useState<AuditFilter>("all");
   const [securityHydrated, setSecurityHydrated] = useState(false);
   const [timeTick, setTimeTick] = useState(() => Date.now());
 
@@ -188,6 +190,19 @@ export const App = () => {
   const filteredPosts = useMemo(() => {
     return filterFeedPosts(posts, activeTab, query, pinnedOnly, pinnedCids);
   }, [activeTab, pinnedOnly, pinnedCids, posts, query]);
+
+  const filteredAuditLog = useMemo(() => {
+    if (auditFilter === "all") {
+      return auditLog;
+    }
+    if (auditFilter === "identity") {
+      return auditLog.filter((entry) => entry.event.startsWith("identity."));
+    }
+    if (auditFilter === "ucan") {
+      return auditLog.filter((entry) => entry.event.startsWith("ucan."));
+    }
+    return auditLog.filter((entry) => entry.event.startsWith("revocation."));
+  }, [auditFilter, auditLog]);
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -248,6 +263,17 @@ export const App = () => {
     anchor.click();
     window.URL.revokeObjectURL(url);
     setActionNote("Demo state exported.");
+  };
+
+  const exportAuditLog = () => {
+    const blob = new Blob([serializeSecurityAuditLog(auditLog)], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `cidfeed-security-audit-${Date.now()}.json`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+    setActionNote("Security audit exported.");
   };
 
   const openWizard = () => {
@@ -760,16 +786,44 @@ export const App = () => {
               )}
               <div className="alerts-panel">
                 <h3>Security Audit</h3>
+                <div className="profile-actions">
+                  <button
+                    className={auditFilter === "all" ? "follow following" : "follow secondary"}
+                    onClick={() => setAuditFilter("all")}
+                  >
+                    All
+                  </button>
+                  <button
+                    className={auditFilter === "identity" ? "follow following" : "follow secondary"}
+                    onClick={() => setAuditFilter("identity")}
+                  >
+                    Identity
+                  </button>
+                  <button
+                    className={auditFilter === "ucan" ? "follow following" : "follow secondary"}
+                    onClick={() => setAuditFilter("ucan")}
+                  >
+                    UCAN
+                  </button>
+                  <button
+                    className={auditFilter === "revocation" ? "follow following" : "follow secondary"}
+                    onClick={() => setAuditFilter("revocation")}
+                  >
+                    Revocations
+                  </button>
+                </div>
                 <div className="alerts-list">
-                  {auditLog.slice(0, 5).map((entry) => (
+                  {filteredAuditLog.slice(0, 5).map((entry) => (
                     <div className="alert-row" key={entry.id}>
                       <span>{entry.event}</span>
                       <span className="muted">{new Date(entry.timestamp).toLocaleTimeString()}</span>
                     </div>
                   ))}
-                  {auditLog.length === 0 && (
+                  {filteredAuditLog.length === 0 && (
                     <div className="alert-row">
-                      <span className="muted">No security actions recorded yet.</span>
+                      <span className="muted">
+                        {auditLog.length === 0 ? "No security actions recorded yet." : "No entries match this filter."}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -865,6 +919,19 @@ export const App = () => {
                   Replay Revocations
                 </button>
                 <button className="follow secondary" onClick={resetDemoState}>Reset Demo Data</button>
+                <button className="follow secondary" onClick={exportAuditLog}>
+                  <Download size={14} />
+                  Export Audit
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    setAuditLog([]);
+                    setActionNote("Security audit log cleared.");
+                  }}
+                >
+                  Clear Audit
+                </button>
                 <button className="follow secondary" onClick={exportDemoState}>
                   <Download size={14} />
                   Export Demo State
