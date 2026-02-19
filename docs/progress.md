@@ -78,6 +78,10 @@
   - core now exposes remaining-time/expiring-soon helpers for delegations
   - profile panel now surfaces `UCAN Expiring Soon` status before expiry
   - expired delegations are automatically queued for offline revocation replay and cleared from active delegation state
+- Added Tauri revocation flush command path:
+  - implemented `flush_revocation_queue` command stub in `packages/tauri/src-tauri/src/main.rs`
+  - extended UI bridge (`packages/ui/src/tauri-security-state.ts`) with flush command client
+  - replay action in `packages/ui/src/App.tsx` now calls Tauri flush in desktop mode and keeps web fallback behavior
 
 ### Phase Tracking
 

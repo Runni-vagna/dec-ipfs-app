@@ -58,7 +58,7 @@ describe("App interactions", () => {
     expect(screen.getByText("Active DID")).toBeTruthy();
   });
 
-  it("creates and revokes ucan delegation from profile tools", () => {
+  it("creates and revokes ucan delegation from profile tools", async () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
@@ -70,6 +70,6 @@ describe("App interactions", () => {
     expect(screen.getByText("Delegate Access")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
-    expect(screen.getByText(/Replayed 1 queued revocation\(s\)\./i)).toBeTruthy();
+    expect(await screen.findByText(/Replayed 1 queued revocation\(s\)\./i)).toBeTruthy();
   });
 });

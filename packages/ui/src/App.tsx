@@ -50,7 +50,11 @@ import {
   type NodeStartMode,
   type PrivateNodeStatus
 } from "./tauri-private-node";
-import { loadSecurityStateCommand, saveSecurityStateCommand } from "./tauri-security-state";
+import {
+  flushRevocationQueueCommand,
+  loadSecurityStateCommand,
+  saveSecurityStateCommand
+} from "./tauri-security-state";
 
 type Tab = ActiveTab;
 
@@ -784,15 +788,26 @@ export const App = () => {
                 </button>
                 <button
                   className="follow secondary"
-                  onClick={() => {
+                  onClick={() => void (async () => {
                     const result = replayOfflineRevocations(revocationQueue, 50);
-                    setRevocationQueue(result.remaining);
                     if (result.replayed.length === 0) {
                       setActionNote("No queued revocations to replay.");
                       return;
                     }
-                    setActionNote(`Replayed ${result.replayed.length} queued revocation(s).`);
-                  }}
+                    const flushed = await flushRevocationQueueCommand(
+                      result.replayed.map((entry) => entry.revocationId)
+                    );
+                    if (!flushed) {
+                      setRevocationQueue(result.remaining);
+                      setActionNote(`Replayed ${result.replayed.length} queued revocation(s).`);
+                      return;
+                    }
+                    const flushedSet = new Set(flushed.flushedIds);
+                    setRevocationQueue((current) =>
+                      current.filter((entry) => !flushedSet.has(entry.revocationId))
+                    );
+                    setActionNote(`Flushed ${flushed.flushedIds.length} revocation(s) via Tauri command.`);
+                  })()}
                 >
                   Replay Revocations
                 </button>

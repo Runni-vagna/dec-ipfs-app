@@ -40,6 +40,12 @@ struct SecurityState {
     revocation_queue_json: Option<String>,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FlushRevocationResult {
+    flushed_ids: Vec<String>,
+}
+
 fn to_status(state: &PrivateNodeState) -> PrivateNodeStatus {
     PrivateNodeStatus {
         online: state.online,
@@ -186,6 +192,22 @@ fn set_security_state(
     persist_security_state(&state.security_state_path, &guard);
 }
 
+#[tauri::command]
+fn flush_revocation_queue(revocation_ids: Vec<String>) -> FlushRevocationResult {
+    let mut flushed_ids: Vec<String> = Vec::new();
+    for revocation_id in revocation_ids {
+        let normalized = revocation_id.trim().to_string();
+        if normalized.is_empty() {
+            continue;
+        }
+        if flushed_ids.iter().any(|existing| existing == &normalized) {
+            continue;
+        }
+        flushed_ids.push(normalized);
+    }
+    FlushRevocationResult { flushed_ids }
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -208,7 +230,8 @@ fn main() {
             stop_private_node,
             simulate_peer_join,
             get_security_state,
-            set_security_state
+            set_security_state,
+            flush_revocation_queue
         ])
         .run(tauri::generate_context!())
         .expect("error while running CIDFeed Tauri app");

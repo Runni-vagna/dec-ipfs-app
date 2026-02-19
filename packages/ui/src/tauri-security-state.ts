@@ -11,6 +11,10 @@ export type SecurityStatePayload = {
   revocationQueueJson: string | null;
 };
 
+export type FlushRevocationResult = {
+  flushedIds: string[];
+};
+
 const hasTauriRuntime = (): boolean => {
   if (typeof window === "undefined") {
     return false;
@@ -35,5 +39,13 @@ export const saveSecurityStateCommand = async (payload: SecurityStatePayload): P
     identityJson: payload.identityJson,
     delegationJson: payload.delegationJson,
     revocationQueueJson: payload.revocationQueueJson
+  });
+};
+
+export const flushRevocationQueueCommand = async (
+  revocationIds: string[]
+): Promise<FlushRevocationResult | null> => {
+  return invokeTauri<FlushRevocationResult>("flush_revocation_queue", {
+    revocationIds
   });
 };
