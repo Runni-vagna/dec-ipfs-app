@@ -13,6 +13,10 @@ export type FeedEntry = {
 
 export type ActiveTab = "main" | "discover" | "private" | "alerts" | "profile";
 export type FeedTab = ActiveTab | "all";
+export type IdentityRecord = {
+  readonly did: string;
+  readonly createdAt: string;
+};
 
 export const createFeedEntry = (postCID: string, timestamp = Date.now()): FeedEntry => {
   if (postCID.trim().length === 0) {
@@ -270,4 +274,104 @@ export const parseImportedFeedState = (raw: string, defaultPosts: readonly FeedP
     pinnedCids,
     posts
   };
+};
+
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+const encodeBase58 = (bytes: Uint8Array): string => {
+  if (bytes.length === 0) {
+    return "";
+  }
+  const digits = [0];
+  for (const byte of bytes) {
+    let carry = byte;
+    for (let i = 0; i < digits.length; i += 1) {
+      const value = (digits[i] ?? 0) * 256 + carry;
+      digits[i] = value % 58;
+      carry = Math.floor(value / 58);
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = Math.floor(carry / 58);
+    }
+  }
+  let result = "";
+  for (const byte of bytes) {
+    if (byte !== 0) {
+      break;
+    }
+    result += BASE58_ALPHABET[0] ?? "1";
+  }
+  for (let i = digits.length - 1; i >= 0; i -= 1) {
+    const digit = digits[i];
+    if (digit === undefined) {
+      continue;
+    }
+    result += BASE58_ALPHABET[digit] ?? "";
+  }
+  return result;
+};
+
+const randomBytes = (length: number): Uint8Array => {
+  const bytes = new Uint8Array(length);
+  if (typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(bytes);
+    return bytes;
+  }
+  for (let i = 0; i < length; i += 1) {
+    bytes[i] = Math.floor(Math.random() * 256);
+  }
+  return bytes;
+};
+
+export const createIdentityRecord = (timestamp = Date.now()): IdentityRecord => {
+  const multicodecPrefix = new Uint8Array([0xed, 0x01]);
+  const publicKey = randomBytes(32);
+  const prefixedKey = new Uint8Array(multicodecPrefix.length + publicKey.length);
+  prefixedKey.set(multicodecPrefix, 0);
+  prefixedKey.set(publicKey, multicodecPrefix.length);
+  const did = `did:key:z${encodeBase58(prefixedKey)}`;
+  return {
+    did,
+    createdAt: new Date(timestamp).toISOString()
+  };
+};
+
+export const isValidDidKey = (did: string): boolean => {
+  return /^did:key:z[1-9A-HJ-NP-Za-km-z]{10,}$/.test(did);
+};
+
+export const serializeIdentityRecord = (identity: IdentityRecord): string => {
+  return JSON.stringify(identity);
+};
+
+export const parseIdentityRecord = (raw: string | null | undefined): IdentityRecord | null => {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isObject(parsed)) {
+    return null;
+  }
+  const did = typeof parsed.did === "string" ? parsed.did : "";
+  const createdAt = typeof parsed.createdAt === "string" ? parsed.createdAt : "";
+  if (!isValidDidKey(did) || createdAt.trim().length === 0) {
+    return null;
+  }
+  return {
+    did,
+    createdAt
+  };
+};
+
+export const formatDidHandle = (did: string): string => {
+  if (did.length <= 24) {
+    return did;
+  }
+  return `${did.slice(0, 18)}...${did.slice(-6)}`;
 };

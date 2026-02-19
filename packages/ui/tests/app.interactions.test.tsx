@@ -48,4 +48,13 @@ describe("App interactions", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByText("Help & Shortcuts")).toBeNull();
   });
+
+  it("creates an identity record from profile tools", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create DID" }));
+
+    expect(screen.getByText("Active DID")).toBeTruthy();
+  });
 });

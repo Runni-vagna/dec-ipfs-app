@@ -9,19 +9,24 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode 
 import { Bell, CircleHelp, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
 import {
   createFeedStateSnapshot,
+  createIdentityRecord,
   createResetFeedState,
   createDraftPost,
   filterFeedPosts,
+  formatDidHandle,
+  parseIdentityRecord,
   parseActiveTab,
   parseImportedFeedState,
   prependFeedPost,
   removeFeedPost,
   restoreFeedPost,
+  serializeIdentityRecord,
   serializeFeedStateSnapshot,
   toFeedPost,
   toggleFlag,
   type ActiveTab,
   type FeedPost,
+  type IdentityRecord,
   type RemovedPostSnapshot
 } from "@cidfeed/core";
 import {
@@ -47,7 +52,8 @@ const STORAGE_KEYS = {
   posts: "cidfeed.ui.posts",
   follows: "cidfeed.ui.follows",
   unread: "cidfeed.ui.unreadAlerts",
-  pins: "cidfeed.ui.pinnedCids"
+  pins: "cidfeed.ui.pinnedCids",
+  identity: "cidfeed.ui.identity"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -95,6 +101,12 @@ export const App = () => {
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
   const [isComposeOpen, setComposeOpen] = useState(false);
   const [isHelpOpen, setHelpOpen] = useState(false);
+  const [identity, setIdentity] = useState<IdentityRecord | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    return parseIdentityRecord(window.localStorage.getItem(STORAGE_KEYS.identity));
+  });
   const [privateNodeOnline, setPrivateNodeOnline] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
   const [draft, setDraft] = useState("");
@@ -305,6 +317,14 @@ export const App = () => {
   }, [unreadAlerts]);
 
   useEffect(() => {
+    if (!identity) {
+      window.localStorage.removeItem(STORAGE_KEYS.identity);
+      return;
+    }
+    window.localStorage.setItem(STORAGE_KEYS.identity, serializeIdentityRecord(identity));
+  }, [identity]);
+
+  useEffect(() => {
     if (activeTab === "alerts" && unreadAlerts > 0) {
       setUnreadAlerts(0);
       setActionNote("Alerts marked as read.");
@@ -370,11 +390,13 @@ export const App = () => {
     setDraft("");
     setUnreadAlerts(reset.unreadAlerts);
     setPosts(reset.posts);
+    setIdentity(null);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
     window.localStorage.removeItem(STORAGE_KEYS.posts);
     window.localStorage.removeItem(STORAGE_KEYS.follows);
     window.localStorage.removeItem(STORAGE_KEYS.unread);
     window.localStorage.removeItem(STORAGE_KEYS.pins);
+    window.localStorage.removeItem(STORAGE_KEYS.identity);
     setActionNote("Demo state reset.");
   };
 
@@ -593,7 +615,31 @@ export const App = () => {
             <>
               <h2>Profile Tools</h2>
               <p className="muted">Quick maintenance actions for your local demo state.</p>
+              <div className="alert-row">
+                <span>{identity ? formatDidHandle(identity.did) : "No DID identity created"}</span>
+                <span className="muted">{identity ? "Active DID" : "Create Identity"}</span>
+              </div>
+              {identity && <p className="muted">Created: {new Date(identity.createdAt).toLocaleString()}</p>}
               <div className="profile-actions">
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    const nextIdentity = createIdentityRecord();
+                    setIdentity(nextIdentity);
+                    setActionNote(`Identity created: ${formatDidHandle(nextIdentity.did)}`);
+                  }}
+                >
+                  Create DID
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    setIdentity(null);
+                    setActionNote("Identity cleared.");
+                  }}
+                >
+                  Clear DID
+                </button>
                 <button className="follow secondary" onClick={resetDemoState}>Reset Demo Data</button>
                 <button className="follow secondary" onClick={exportDemoState}>
                   <Download size={14} />

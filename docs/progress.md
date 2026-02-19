@@ -52,6 +52,10 @@
   - added `start_private_node_mode` command in `packages/tauri/src-tauri/src/main.rs` with strict mode validation (`easy`/`private`)
   - extended `packages/ui/src/tauri-private-node.ts` with mode-aware invoke helper
   - updated wizard "Quick Start" and "Finish & Start Node" in `packages/ui/src/App.tsx` to call mode-specific node start command with web fallback
+- Added Phase 1 identity foundation (local DID scaffold):
+  - implemented DID-key identity utilities in `packages/core/src/index.ts` (create/validate/serialize/parse/format)
+  - wired profile UI identity actions in `packages/ui/src/App.tsx` (`Create DID`, `Clear DID`) with local persistence
+  - expanded core tests for identity helpers and UI tests for profile DID creation flow
 
 ### Phase Tracking
 

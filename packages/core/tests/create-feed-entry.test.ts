@@ -7,17 +7,22 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  createIdentityRecord,
   createFeedStateSnapshot,
   createResetFeedState,
   createDraftPost,
   createFeedEntry,
   createLocalCID,
   filterFeedPosts,
+  formatDidHandle,
+  isValidDidKey,
+  parseIdentityRecord,
   parseActiveTab,
   parseImportedFeedState,
   prependFeedPost,
   removeFeedPost,
   restoreFeedPost,
+  serializeIdentityRecord,
   serializeFeedStateSnapshot,
   toFeedPost,
   toggleFlag
@@ -167,5 +172,28 @@ describe("feed state serialization", () => {
     expect(parsed.pinnedCids.p1).toBe(true);
     expect(parsed.posts[0]?.body).toBe("default");
     expect(() => parseImportedFeedState("not json", defaults)).toThrow("Import failed: invalid JSON.");
+  });
+});
+
+describe("identity helpers", () => {
+  it("creates a valid did:key identity record", () => {
+    const identity = createIdentityRecord(1700000000000);
+    expect(isValidDidKey(identity.did)).toBe(true);
+    expect(identity.createdAt).toBe("2023-11-14T22:13:20.000Z");
+  });
+
+  it("serializes and parses identity", () => {
+    const identity = createIdentityRecord(1700000000000);
+    const raw = serializeIdentityRecord(identity);
+    const parsed = parseIdentityRecord(raw);
+    expect(parsed?.did).toBe(identity.did);
+    expect(parsed?.createdAt).toBe(identity.createdAt);
+  });
+
+  it("rejects invalid identity payload and formats did handles", () => {
+    expect(parseIdentityRecord("{\"did\":\"invalid\",\"createdAt\":\"x\"}")).toBeNull();
+    expect(parseIdentityRecord("not-json")).toBeNull();
+    const formatted = formatDidHandle("did:key:z123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");
+    expect(formatted.includes("...")).toBe(true);
   });
 });
