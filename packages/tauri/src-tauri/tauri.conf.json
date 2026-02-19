@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "app.cidfeed.desktop",
   "build": {
-    "beforeDevCommand": "sh -c 'curl -sf http://127.0.0.1:5173 >/dev/null || pnpm --filter @cidfeed/ui dev'",
+    "beforeDevCommand": "sh -c 'if curl -sf http://127.0.0.1:5173 >/dev/null; then exit 0; fi; if pgrep -f \"vite --port 5173\" >/dev/null; then for i in $(seq 1 40); do curl -sf http://127.0.0.1:5173 >/dev/null && exit 0; sleep 0.25; done; fi; pnpm --filter @cidfeed/ui dev'",
     "beforeBuildCommand": "pnpm --filter @cidfeed/ui build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../../ui/dist"
