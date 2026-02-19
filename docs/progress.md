@@ -165,6 +165,10 @@
   - new sessions now start with safe replay enabled when no preference exists
   - explicit user preferences are preserved via persisted `true`/`false` values
   - expanded UI tests to validate default-on behavior and replay flow compatibility
+- Added temporary unsafe replay override with expiry:
+  - profile now includes `Temporarily Allow Unsafe Replay (5m)` action for controlled emergency bypass of Safe Replay deny
+  - override expiry is persisted (`cidfeed.ui.unsafeReplayOverrideUntil`) and auto-clears after timeout
+  - expanded UI tests to verify replay succeeds during active override window
 
 ### Phase Tracking
 

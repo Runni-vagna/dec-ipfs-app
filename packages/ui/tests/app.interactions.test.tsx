@@ -211,6 +211,33 @@ describe("App interactions", () => {
     expect(screen.queryByText(/Replayed 1 queued revocation\(s\)\./i)).toBeNull();
   });
 
+  it("allows unsafe replay while temporary override is active", async () => {
+    const now = Date.now();
+    window.localStorage.setItem(
+      "cidfeed.ui.offlineRevocationQueue",
+      JSON.stringify([{ revocationId: "revoke-override-1", queuedAt: now - 1000, reason: "manual profile revoke" }])
+    );
+    window.localStorage.setItem(
+      "cidfeed.ui.revocationList",
+      JSON.stringify({
+        version: "1.1",
+        updatedAt: now,
+        issuerDid: "did:key:z123456789ABCDEFGHJKLMN",
+        signature: `sig-${now}`,
+        entries: [{ revocationId: "revoke-override-1", revokedAt: now, reason: "marker" }]
+      })
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Temporarily Allow Unsafe Replay (5m)" }));
+    expect(screen.getByText("Temporary unsafe replay override enabled for 5 minutes.")).toBeTruthy();
+    expect(screen.getByText(/Unsafe replay override active until/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
+    expect(await screen.findByText(/Replayed 1 queued revocation\(s\)\./i)).toBeTruthy();
+  });
+
   it("shows revoked status when delegation revocation id exists in revocation list", () => {
     const now = Date.now();
     window.localStorage.setItem(

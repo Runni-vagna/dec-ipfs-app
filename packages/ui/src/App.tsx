@@ -103,7 +103,8 @@ const STORAGE_KEYS = {
   failedFlushQueue: "cidfeed.ui.failedFlushQueue",
   retryHighStreak: "cidfeed.ui.retryHighStreak",
   retryEscalationAcknowledgedAt: "cidfeed.ui.retryEscalationAcknowledgedAt",
-  safeReplayOnly: "cidfeed.ui.safeReplayOnly"
+  safeReplayOnly: "cidfeed.ui.safeReplayOnly",
+  unsafeReplayOverrideUntil: "cidfeed.ui.unsafeReplayOverrideUntil"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -225,6 +226,14 @@ export const App = () => {
       return true;
     }
     return raw === "true";
+  });
+  const [unsafeReplayOverrideUntil, setUnsafeReplayOverrideUntil] = useState<number | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    const raw = window.localStorage.getItem(STORAGE_KEYS.unsafeReplayOverrideUntil);
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   });
 
   const recordSecurityEvent = (
@@ -350,6 +359,10 @@ export const App = () => {
   const retryEscalationAcknowledged = useMemo(
     () => retryEscalationActive && retryEscalationAcknowledgedAt !== null,
     [retryEscalationActive, retryEscalationAcknowledgedAt]
+  );
+  const unsafeReplayOverrideActive = useMemo(
+    () => unsafeReplayOverrideUntil !== null && unsafeReplayOverrideUntil > timeTick,
+    [timeTick, unsafeReplayOverrideUntil]
   );
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
@@ -600,6 +613,15 @@ export const App = () => {
   }, [retryEscalationAcknowledgedAt, retryEscalationActive]);
 
   useEffect(() => {
+    if (!unsafeReplayOverrideUntil) {
+      return;
+    }
+    if (unsafeReplayOverrideUntil <= timeTick) {
+      setUnsafeReplayOverrideUntil(null);
+    }
+  }, [timeTick, unsafeReplayOverrideUntil]);
+
+  useEffect(() => {
     if (!securityHydrated) {
       return;
     }
@@ -662,6 +684,11 @@ export const App = () => {
       window.localStorage.removeItem(STORAGE_KEYS.retryEscalationAcknowledgedAt);
     }
     window.localStorage.setItem(STORAGE_KEYS.safeReplayOnly, safeReplayOnly ? "true" : "false");
+    if (unsafeReplayOverrideUntil !== null) {
+      window.localStorage.setItem(STORAGE_KEYS.unsafeReplayOverrideUntil, String(unsafeReplayOverrideUntil));
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.unsafeReplayOverrideUntil);
+    }
 
     void saveSecurityStateCommand({
       identityJson,
@@ -683,7 +710,8 @@ export const App = () => {
     retryEscalationAcknowledgedAt,
     safeReplayOnly,
     securityHydrated,
-    trustedRevocationIssuers
+    trustedRevocationIssuers,
+    unsafeReplayOverrideUntil
   ]);
 
   useEffect(() => {
@@ -779,6 +807,7 @@ export const App = () => {
     setRetryEscalationAcknowledgedAt(null);
     setUnsafeReplayConfirmArmed(false);
     setSafeReplayOnly(true);
+    setUnsafeReplayOverrideUntil(null);
     setAuditLog([]);
     setFailedFlushQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
@@ -794,6 +823,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.retryHighStreak);
     window.localStorage.removeItem(STORAGE_KEYS.retryEscalationAcknowledgedAt);
     window.localStorage.setItem(STORAGE_KEYS.safeReplayOnly, "true");
+    window.localStorage.removeItem(STORAGE_KEYS.unsafeReplayOverrideUntil);
     window.localStorage.removeItem(STORAGE_KEYS.auditLog);
     window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
     setActionNote("Demo state reset.");
@@ -1290,9 +1320,31 @@ export const App = () => {
                 </button>
                 <button
                   className="follow secondary"
+                  onClick={() => {
+                    const overrideUntil = Date.now() + 5 * 60 * 1000;
+                    setUnsafeReplayOverrideUntil(overrideUntil);
+                    setUnsafeReplayConfirmArmed(false);
+                    recordSecurityEvent(
+                      "revocation.verified",
+                      `temporary unsafe replay override granted until ${new Date(overrideUntil).toISOString()}`
+                    );
+                    setActionNote("Temporary unsafe replay override enabled for 5 minutes.");
+                  }}
+                >
+                  Temporarily Allow Unsafe Replay (5m)
+                </button>
+                {unsafeReplayOverrideActive && (
+                  <div className="alert-row">
+                    <span>
+                      Unsafe replay override active until {new Date(unsafeReplayOverrideUntil ?? 0).toLocaleTimeString()}.
+                    </span>
+                  </div>
+                )}
+                <button
+                  className="follow secondary"
                   onClick={() => void (async () => {
                     if (revocationList.entries.length > 0 && revocationListPolicyStatus !== "valid") {
-                      if (safeReplayOnly) {
+                      if (safeReplayOnly && !unsafeReplayOverrideActive) {
                         recordSecurityEvent(
                           "revocation.verified",
                           `unsafe replay denied (${revocationListPolicyStatus}) due to safe replay mode`
@@ -1302,7 +1354,7 @@ export const App = () => {
                         );
                         return;
                       }
-                      if (!unsafeReplayConfirmArmed) {
+                      if (!safeReplayOnly && !unsafeReplayConfirmArmed) {
                         setUnsafeReplayConfirmArmed(true);
                         recordSecurityEvent(
                           "revocation.verified",
