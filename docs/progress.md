@@ -161,6 +161,10 @@
   - profile now exposes `Safe Replay Only: On/Off` toggle persisted in local storage (`cidfeed.ui.safeReplayOnly`)
   - when enabled, unsafe replay (`invalid-signature` / `untrusted-issuer`) is denied with no confirmation bypass
   - expanded UI tests to verify unsafe replay remains blocked while safe replay mode is enabled
+- Set `Safe Replay Only` default to secure-by-default:
+  - new sessions now start with safe replay enabled when no preference exists
+  - explicit user preferences are preserved via persisted `true`/`false` values
+  - expanded UI tests to validate default-on behavior and replay flow compatibility
 
 ### Phase Tracking
 

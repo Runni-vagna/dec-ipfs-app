@@ -218,9 +218,13 @@ export const App = () => {
   const [unsafeReplayConfirmArmed, setUnsafeReplayConfirmArmed] = useState(false);
   const [safeReplayOnly, setSafeReplayOnly] = useState<boolean>(() => {
     if (typeof window === "undefined") {
-      return false;
+      return true;
     }
-    return window.localStorage.getItem(STORAGE_KEYS.safeReplayOnly) === "true";
+    const raw = window.localStorage.getItem(STORAGE_KEYS.safeReplayOnly);
+    if (raw === null) {
+      return true;
+    }
+    return raw === "true";
   });
 
   const recordSecurityEvent = (
@@ -657,11 +661,7 @@ export const App = () => {
     } else {
       window.localStorage.removeItem(STORAGE_KEYS.retryEscalationAcknowledgedAt);
     }
-    if (safeReplayOnly) {
-      window.localStorage.setItem(STORAGE_KEYS.safeReplayOnly, "true");
-    } else {
-      window.localStorage.removeItem(STORAGE_KEYS.safeReplayOnly);
-    }
+    window.localStorage.setItem(STORAGE_KEYS.safeReplayOnly, safeReplayOnly ? "true" : "false");
 
     void saveSecurityStateCommand({
       identityJson,
@@ -778,7 +778,7 @@ export const App = () => {
     setRetryHighStreak(0);
     setRetryEscalationAcknowledgedAt(null);
     setUnsafeReplayConfirmArmed(false);
-    setSafeReplayOnly(false);
+    setSafeReplayOnly(true);
     setAuditLog([]);
     setFailedFlushQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
@@ -793,7 +793,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.trustedRevocationIssuers);
     window.localStorage.removeItem(STORAGE_KEYS.retryHighStreak);
     window.localStorage.removeItem(STORAGE_KEYS.retryEscalationAcknowledgedAt);
-    window.localStorage.removeItem(STORAGE_KEYS.safeReplayOnly);
+    window.localStorage.setItem(STORAGE_KEYS.safeReplayOnly, "true");
     window.localStorage.removeItem(STORAGE_KEYS.auditLog);
     window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
     setActionNote("Demo state reset.");

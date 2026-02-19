@@ -43,3 +43,4 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Escalation acknowledgement is now explicitly captured in local state and audit log for operator accountability.
 - Replay operation now enforces an explicit unsafe confirmation step when revocation policy is not `valid`.
 - Optional `Safe Replay Only` mode now enforces strict deny-by-default behavior for unsafe replay attempts.
+- `Safe Replay Only` now defaults to enabled for new sessions to minimize accidental unsafe replay.

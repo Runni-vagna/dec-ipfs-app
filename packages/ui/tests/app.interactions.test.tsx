@@ -27,6 +27,12 @@ describe("App interactions", () => {
     expect(screen.getByText(/OrbitDB sync in 642ms/i)).toBeTruthy();
   });
 
+  it("defaults safe replay only to on for new sessions", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    expect(screen.getByRole("button", { name: "Safe Replay Only: On" })).toBeTruthy();
+  });
+
   it("publishes a mock post from compose modal", () => {
     render(<App />);
 
@@ -60,6 +66,7 @@ describe("App interactions", () => {
   });
 
   it("creates and revokes ucan delegation from profile tools", async () => {
+    window.localStorage.setItem("cidfeed.ui.safeReplayOnly", "false");
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
@@ -118,6 +125,7 @@ describe("App interactions", () => {
   });
 
   it("re-queues ready failed flush retries from profile tools", async () => {
+    window.localStorage.setItem("cidfeed.ui.safeReplayOnly", "false");
     window.localStorage.setItem(
       "cidfeed.ui.failedFlushQueue",
       JSON.stringify([
@@ -148,6 +156,7 @@ describe("App interactions", () => {
   });
 
   it("requires confirm before replay when revocation policy is unsafe", async () => {
+    window.localStorage.setItem("cidfeed.ui.safeReplayOnly", "false");
     const now = Date.now();
     window.localStorage.setItem(
       "cidfeed.ui.offlineRevocationQueue",
@@ -193,8 +202,7 @@ describe("App interactions", () => {
 
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
-    fireEvent.click(screen.getByRole("button", { name: "Safe Replay Only: Off" }));
-    expect(screen.getByText("Safe replay only enabled.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Safe Replay Only: On" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
     expect(screen.getByText(/Replay denied: policy is invalid-signature and Safe Replay Only is enabled\./i)).toBeTruthy();
