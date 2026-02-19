@@ -48,3 +48,4 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Override UX now includes countdown + disabled re-arm to reduce operator error during emergency bypass windows.
 - Emergency override can now be cancelled instantly from profile to restore strict replay safety.
 - Profile now surfaces a compact replay safety state summary to reduce operator ambiguity before replay actions.
+- Storage telemetry panel now surfaces budget saturation risk (`high`/`critical`) to reduce pinning cost overrun risk.

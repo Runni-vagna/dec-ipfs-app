@@ -35,6 +35,24 @@ describe("App interactions", () => {
     expect(screen.getByText(/safeOnly=on/i)).toBeTruthy();
   });
 
+  it("shows storage risk and warning when budget usage is high", () => {
+    const now = Date.now();
+    window.localStorage.setItem(
+      "cidfeed.ui.storageTelemetry",
+      JSON.stringify({
+        budgetUsd: 25,
+        spentUsd: 23,
+        pinningOps: 12,
+        lastUpdated: now
+      })
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    expect(screen.getByText("Risk level: high")).toBeTruthy();
+    expect(screen.getByText(/Storage budget risk is high/i)).toBeTruthy();
+  });
+
   it("publishes a mock post from compose modal", () => {
     render(<App />);
 

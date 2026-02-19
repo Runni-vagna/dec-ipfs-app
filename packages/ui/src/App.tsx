@@ -10,6 +10,7 @@ import { Bell, CircleHelp, Compass, Download, Home, Plus, Search, Shield, Trash2
 import {
   appendSecurityAuditEntry,
   addRevocationListEntry,
+  createStorageTelemetry,
   createSecurityAuditEntry,
   createOfflineRevocationEntry,
   createRevocationList,
@@ -21,11 +22,14 @@ import {
   enqueueOfflineRevocation,
   filterFeedPosts,
   formatDidHandle,
+  getStorageRiskLevel,
+  getStorageUsageRatio,
   isUcanDelegationExpiringSoon,
   isUcanDelegationExpired,
   parseFailedRevocationRetries,
   parseOfflineRevocationQueue,
   parseIdentityRecord,
+  parseStorageTelemetry,
   parseTrustedDidList,
   parseRevocationList,
   parseActiveTab,
@@ -34,6 +38,7 @@ import {
   parseSecurityAuditLog,
   replayOfflineRevocations,
   removeFailedRetries,
+  recordPinCost,
   signRevocationList,
   prependFeedPost,
   splitReadyFailedRetries,
@@ -44,6 +49,7 @@ import {
   serializeIdentityRecord,
   serializeRevocationList,
   serializeSecurityAuditLog,
+  serializeStorageTelemetry,
   serializeTrustedDidList,
   serializeUcanDelegation,
   serializeFeedStateSnapshot,
@@ -57,6 +63,7 @@ import {
   type RevocationListRecord,
   type RemovedPostSnapshot,
   type SecurityAuditEntry,
+  type StorageTelemetry,
   type UcanDelegationRecord,
   upsertFailedRevocationRetries,
   verifyRevocationListPolicy,
@@ -104,7 +111,8 @@ const STORAGE_KEYS = {
   retryHighStreak: "cidfeed.ui.retryHighStreak",
   retryEscalationAcknowledgedAt: "cidfeed.ui.retryEscalationAcknowledgedAt",
   safeReplayOnly: "cidfeed.ui.safeReplayOnly",
-  unsafeReplayOverrideUntil: "cidfeed.ui.unsafeReplayOverrideUntil"
+  unsafeReplayOverrideUntil: "cidfeed.ui.unsafeReplayOverrideUntil",
+  storageTelemetry: "cidfeed.ui.storageTelemetry"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -236,6 +244,13 @@ export const App = () => {
     const parsed = raw ? Number(raw) : NaN;
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   });
+  const [storageTelemetry, setStorageTelemetry] = useState<StorageTelemetry>(() => {
+    if (typeof window === "undefined") {
+      return createStorageTelemetry(25);
+    }
+    const parsed = parseStorageTelemetry(window.localStorage.getItem(STORAGE_KEYS.storageTelemetry));
+    return parsed ?? createStorageTelemetry(25);
+  });
 
   const recordSecurityEvent = (
     event:
@@ -332,6 +347,8 @@ export const App = () => {
       severity
     };
   }, [failedFlushQueue, timeTick]);
+  const storageUsageRatio = useMemo(() => getStorageUsageRatio(storageTelemetry), [storageTelemetry]);
+  const storageRiskLevel = useMemo(() => getStorageRiskLevel(storageTelemetry), [storageTelemetry]);
   const securityWarnings = useMemo(() => {
     const warnings: string[] = [];
     if (revocationList.entries.length > 0 && revocationListPolicyStatus === "invalid-signature") {
@@ -348,13 +365,21 @@ export const App = () => {
     if (revocationQueue.length > 25) {
       warnings.push(`Offline revocation queue backlog is ${revocationQueue.length}. Replay soon.`);
     }
+    if (storageRiskLevel === "high" || storageRiskLevel === "critical") {
+      warnings.push(
+        `Storage budget risk is ${storageRiskLevel}: $${storageTelemetry.spentUsd.toFixed(2)} / $${storageTelemetry.budgetUsd.toFixed(2)} used.`
+      );
+    }
     return warnings;
   }, [
     failedFlushQueue.length,
     failedRetryStatus,
     revocationList.entries.length,
     revocationListPolicyStatus,
-    revocationQueue.length
+    revocationQueue.length,
+    storageRiskLevel,
+    storageTelemetry.budgetUsd,
+    storageTelemetry.spentUsd
   ]);
   const retryEscalationActive = useMemo(() => retryHighStreak >= 3, [retryHighStreak]);
   const retryEscalationAcknowledged = useMemo(
@@ -652,6 +677,7 @@ export const App = () => {
     const auditLogJson = auditLog.length > 0 ? serializeSecurityAuditLog(auditLog) : null;
     const failedFlushQueueJson =
       failedFlushQueue.length > 0 ? serializeFailedRevocationRetries(failedFlushQueue) : null;
+    const storageTelemetryJson = serializeStorageTelemetry(storageTelemetry);
 
     if (identityJson) {
       window.localStorage.setItem(STORAGE_KEYS.identity, identityJson);
@@ -707,6 +733,7 @@ export const App = () => {
     } else {
       window.localStorage.removeItem(STORAGE_KEYS.unsafeReplayOverrideUntil);
     }
+    window.localStorage.setItem(STORAGE_KEYS.storageTelemetry, storageTelemetryJson);
 
     void saveSecurityStateCommand({
       identityJson,
@@ -728,6 +755,7 @@ export const App = () => {
     retryEscalationAcknowledgedAt,
     safeReplayOnly,
     securityHydrated,
+    storageTelemetry,
     trustedRevocationIssuers,
     unsafeReplayOverrideUntil
   ]);
@@ -826,6 +854,7 @@ export const App = () => {
     setUnsafeReplayConfirmArmed(false);
     setSafeReplayOnly(true);
     setUnsafeReplayOverrideUntil(null);
+    setStorageTelemetry(createStorageTelemetry(25));
     setAuditLog([]);
     setFailedFlushQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
@@ -842,6 +871,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.retryEscalationAcknowledgedAt);
     window.localStorage.setItem(STORAGE_KEYS.safeReplayOnly, "true");
     window.localStorage.removeItem(STORAGE_KEYS.unsafeReplayOverrideUntil);
+    window.localStorage.removeItem(STORAGE_KEYS.storageTelemetry);
     window.localStorage.removeItem(STORAGE_KEYS.auditLog);
     window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
     setActionNote("Demo state reset.");
@@ -1094,6 +1124,45 @@ export const App = () => {
                   </p>
                 </>
               )}
+              <div className="alerts-panel">
+                <h3>Storage Risk</h3>
+                <div className="alerts-list">
+                  <div className="alert-row">
+                    <span>
+                      Budget: ${storageTelemetry.spentUsd.toFixed(2)} / ${storageTelemetry.budgetUsd.toFixed(2)} ({Math.round(storageUsageRatio * 100)}%)
+                    </span>
+                  </div>
+                  <div className="alert-row">
+                    <span>Risk level: {storageRiskLevel}</span>
+                  </div>
+                  <div className="alert-row">
+                    <span>Pin ops: {storageTelemetry.pinningOps}</span>
+                  </div>
+                  <div className="alert-row">
+                    <span>Last update: {new Date(storageTelemetry.lastUpdated).toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="profile-actions">
+                  <button
+                    className="follow secondary"
+                    onClick={() => {
+                      setStorageTelemetry((current) => recordPinCost(current, 0.25));
+                      setActionNote("Simulated pin spend: +$0.25.");
+                    }}
+                  >
+                    Simulate Pin Spend ($0.25)
+                  </button>
+                  <button
+                    className="follow secondary"
+                    onClick={() => {
+                      setStorageTelemetry(createStorageTelemetry(storageTelemetry.budgetUsd));
+                      setActionNote("Storage telemetry reset.");
+                    }}
+                  >
+                    Reset Storage Budget
+                  </button>
+                </div>
+              </div>
               <div className="alerts-panel">
                 <h3>Escalation</h3>
                 <div className="alerts-list">

@@ -75,6 +75,13 @@ export type SecurityAuditEntry = {
   readonly detail: string;
   readonly timestamp: number;
 };
+export type StorageRiskLevel = "low" | "medium" | "high" | "critical";
+export type StorageTelemetry = {
+  readonly budgetUsd: number;
+  readonly spentUsd: number;
+  readonly pinningOps: number;
+  readonly lastUpdated: number;
+};
 
 export const createFeedEntry = (postCID: string, timestamp = Date.now()): FeedEntry => {
   if (postCID.trim().length === 0) {
@@ -85,6 +92,95 @@ export const createFeedEntry = (postCID: string, timestamp = Date.now()): FeedEn
     postCID,
     timestamp,
     version: "1.1"
+  };
+};
+
+export const createStorageTelemetry = (budgetUsd = 25, now = Date.now()): StorageTelemetry => {
+  if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) {
+    throw new Error("budgetUsd must be a positive number");
+  }
+  return {
+    budgetUsd,
+    spentUsd: 0,
+    pinningOps: 0,
+    lastUpdated: now
+  };
+};
+
+export const recordPinCost = (
+  telemetry: StorageTelemetry,
+  costUsd: number,
+  now = Date.now()
+): StorageTelemetry => {
+  if (!Number.isFinite(costUsd) || costUsd <= 0) {
+    throw new Error("costUsd must be a positive number");
+  }
+  return {
+    budgetUsd: telemetry.budgetUsd,
+    spentUsd: Number((telemetry.spentUsd + costUsd).toFixed(4)),
+    pinningOps: telemetry.pinningOps + 1,
+    lastUpdated: now
+  };
+};
+
+export const getStorageUsageRatio = (telemetry: StorageTelemetry): number => {
+  if (telemetry.budgetUsd <= 0) {
+    return 0;
+  }
+  return telemetry.spentUsd / telemetry.budgetUsd;
+};
+
+export const getStorageRiskLevel = (telemetry: StorageTelemetry): StorageRiskLevel => {
+  const ratio = getStorageUsageRatio(telemetry);
+  if (ratio >= 1) {
+    return "critical";
+  }
+  if (ratio >= 0.9) {
+    return "high";
+  }
+  if (ratio >= 0.7) {
+    return "medium";
+  }
+  return "low";
+};
+
+export const serializeStorageTelemetry = (telemetry: StorageTelemetry): string => {
+  return JSON.stringify(telemetry);
+};
+
+export const parseStorageTelemetry = (raw: string | null | undefined): StorageTelemetry | null => {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isObject(parsed)) {
+    return null;
+  }
+  const budgetUsd = typeof parsed.budgetUsd === "number" ? parsed.budgetUsd : NaN;
+  const spentUsd = typeof parsed.spentUsd === "number" ? parsed.spentUsd : NaN;
+  const pinningOps = typeof parsed.pinningOps === "number" ? parsed.pinningOps : NaN;
+  const lastUpdated = typeof parsed.lastUpdated === "number" ? parsed.lastUpdated : NaN;
+  if (
+    !Number.isFinite(budgetUsd) ||
+    budgetUsd <= 0 ||
+    !Number.isFinite(spentUsd) ||
+    spentUsd < 0 ||
+    !Number.isFinite(pinningOps) ||
+    pinningOps < 0 ||
+    !Number.isFinite(lastUpdated)
+  ) {
+    return null;
+  }
+  return {
+    budgetUsd,
+    spentUsd,
+    pinningOps: Math.floor(pinningOps),
+    lastUpdated
   };
 };
 

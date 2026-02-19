@@ -181,6 +181,12 @@
 - Added compact replay safety summary row:
   - profile now shows `Replay safety state` summary (`policy`, `safeOnly`, `override`) above replay controls
   - expanded UI tests for default replay safety summary visibility
+- Added Phase 2 storage telemetry groundwork:
+  - added core storage telemetry helpers in `packages/core/src/index.ts` (create, record spend, usage ratio, risk level, parse/serialize)
+  - added core tests for storage telemetry behavior in `packages/core/tests/create-feed-entry.test.ts`
+  - profile now includes `Storage Risk` panel with budget usage, risk level, pin ops, and last update
+  - added profile actions to simulate pin spend and reset storage telemetry
+  - expanded UI tests to validate high storage risk warning rendering
 
 ### Phase Tracking
 

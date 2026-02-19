@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   appendSecurityAuditEntry,
+  createStorageTelemetry,
   createOfflineRevocationEntry,
   createRevocationList,
   createRevocationId,
@@ -22,6 +23,8 @@ import {
   enqueueOfflineRevocation,
   filterFeedPosts,
   formatDidHandle,
+  getStorageRiskLevel,
+  getStorageUsageRatio,
   getUcanRemainingMs,
   isUcanDelegationExpiringSoon,
   isUcanDelegationExpired,
@@ -29,6 +32,7 @@ import {
   isValidDidKey,
   parseOfflineRevocationQueue,
   parseFailedRevocationRetries,
+  parseStorageTelemetry,
   parseRevocationList,
   parseSecurityAuditLog,
   replayOfflineRevocations,
@@ -39,12 +43,14 @@ import {
   prependFeedPost,
   removeFeedPost,
   removeFailedRetries,
+  recordPinCost,
   restoreFeedPost,
   serializeFailedRevocationRetries,
   serializeOfflineRevocationQueue,
   serializeRevocationList,
   serializeSecurityAuditLog,
   serializeIdentityRecord,
+  serializeStorageTelemetry,
   serializeTrustedDidList,
   serializeUcanDelegation,
   serializeFeedStateSnapshot,
@@ -433,5 +439,26 @@ describe("failed revocation retry helpers", () => {
     const parsed = parseFailedRevocationRetries(raw);
     expect(parsed).toHaveLength(2);
     expect(parseFailedRevocationRetries("bad-json")).toHaveLength(0);
+  });
+});
+
+describe("storage telemetry helpers", () => {
+  it("tracks pin spend and computes risk level", () => {
+    const base = createStorageTelemetry(10, 1000);
+    const updated = recordPinCost(base, 7.5, 2000);
+    expect(updated.pinningOps).toBe(1);
+    expect(updated.spentUsd).toBe(7.5);
+    expect(getStorageUsageRatio(updated)).toBe(0.75);
+    expect(getStorageRiskLevel(updated)).toBe("medium");
+  });
+
+  it("serializes and parses telemetry safely", () => {
+    const telemetry = recordPinCost(createStorageTelemetry(5, 1000), 1.25, 2000);
+    const raw = serializeStorageTelemetry(telemetry);
+    const parsed = parseStorageTelemetry(raw);
+    expect(parsed?.budgetUsd).toBe(5);
+    expect(parsed?.spentUsd).toBe(1.25);
+    expect(parsed?.pinningOps).toBe(1);
+    expect(parseStorageTelemetry("bad-json")).toBeNull();
   });
 });
