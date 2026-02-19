@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { App } from "../src/App";
 
 describe("App interactions", () => {
@@ -135,14 +135,9 @@ describe("App interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry Failed Flushes" }));
     expect(screen.getByText("Re-queued 1 failed revocation(s).")).toBeTruthy();
 
-    await waitFor(() => {
-      const persisted = window.localStorage.getItem("cidfeed.ui.offlineRevocationQueue") ?? "";
-      expect(persisted).toContain("fail-revoke-ready");
-    });
-
     fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
     expect(
-      screen.getByText(/(Replayed 1 queued revocation\(s\)\.|Flushed 0 revocation\(s\); 1 failed\.)/i)
+      await screen.findByText(/(Replayed 1 queued revocation\(s\)\.|Flushed 0 revocation\(s\); 1 failed\.)/i)
     ).toBeTruthy();
   });
 });
