@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Bell, Compass, Home, Plus, Search, Shield, User, X } from "lucide-react";
+import { Bell, Compass, Download, Home, Plus, Search, Shield, Trash2, User, X } from "lucide-react";
 
 type Tab = "main" | "discover" | "private" | "alerts" | "profile";
 
@@ -14,6 +14,11 @@ type FeedItem = {
   cid: string;
   body: string;
   tag: Tab | "all";
+};
+
+type RemovedSnapshot = {
+  post: FeedItem;
+  index: number;
 };
 
 const STORAGE_KEYS = {
@@ -74,6 +79,7 @@ export const App = () => {
   const [isComposeOpen, setComposeOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [actionNote, setActionNote] = useState("Ready");
+  const [lastRemoved, setLastRemoved] = useState<RemovedSnapshot | null>(null);
   const [unreadAlerts, setUnreadAlerts] = useState<number>(() => {
     if (typeof window === "undefined") {
       return 2;
@@ -130,6 +136,55 @@ export const App = () => {
     setComposeOpen(false);
   };
 
+  const removePost = (target: FeedItem) => {
+    setPosts((current) => {
+      const index = current.findIndex((post) => post.cid === target.cid && post.body === target.body);
+      if (index === -1) {
+        return current;
+      }
+      const next = [...current];
+      const [removed] = next.splice(index, 1);
+      if (removed) {
+        setLastRemoved({ post: removed, index });
+        setActionNote(`Removed ${removed.cid}...`);
+      }
+      return next;
+    });
+  };
+
+  const undoRemove = () => {
+    if (!lastRemoved) {
+      return;
+    }
+    setPosts((current) => {
+      const next = [...current];
+      const safeIndex = Math.max(0, Math.min(lastRemoved.index, next.length));
+      next.splice(safeIndex, 0, lastRemoved.post);
+      return next;
+    });
+    setLastRemoved(null);
+    setActionNote("Removal undone.");
+  };
+
+  const exportDemoState = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      activeTab,
+      unreadAlerts,
+      followedCids,
+      pinnedCids,
+      posts
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `cidfeed-demo-state-${Date.now()}.json`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+    setActionNote("Demo state exported.");
+  };
+
   const tabTitle: Record<Tab, string> = {
     main: "Main",
     discover: "Discover",
@@ -180,6 +235,10 @@ export const App = () => {
         setActionNote("Search opened (shortcut: /).");
         setTimeout(() => searchInputRef.current?.focus(), 0);
       }
+      if (!inFormField && event.key.toLowerCase() === "u" && lastRemoved) {
+        event.preventDefault();
+        undoRemove();
+      }
       if (event.key === "Escape") {
         setWizardOpen(false);
         setComposeOpen(false);
@@ -187,7 +246,7 @@ export const App = () => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [lastRemoved]);
 
   const resetDemoState = () => {
     setActiveTab("main");
@@ -212,6 +271,11 @@ export const App = () => {
     <div className="app-shell">
       <div className="ambient" aria-hidden="true" />
       <div className="status-pill" aria-live="polite">{actionNote}</div>
+      {lastRemoved && (
+        <button className="undo-pill" onClick={undoRemove}>
+          Undo remove (U)
+        </button>
+      )}
       <main className="layout">
         <aside className="glass panel sidebar">
           <div className="brand">CIDFeed</div>
@@ -330,6 +394,9 @@ export const App = () => {
                     >
                       {isFollowed ? "Following" : "Follow"}
                     </button>
+                    <button className="follow secondary" onClick={() => removePost(post)}>
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </article>
               );
@@ -363,7 +430,13 @@ export const App = () => {
             <>
               <h2>Profile Tools</h2>
               <p className="muted">Quick maintenance actions for your local demo state.</p>
-              <button className="follow secondary" onClick={resetDemoState}>Reset Demo Data</button>
+              <div className="profile-actions">
+                <button className="follow secondary" onClick={resetDemoState}>Reset Demo Data</button>
+                <button className="follow secondary" onClick={exportDemoState}>
+                  <Download size={14} />
+                  Export Demo State
+                </button>
+              </div>
             </>
           )}
           {activeTab === "alerts" && (

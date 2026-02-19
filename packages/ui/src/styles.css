@@ -49,6 +49,19 @@ button {
   color: #9cefe2;
 }
 
+.undo-pill {
+  position: fixed;
+  top: 0.9rem;
+  left: 1rem;
+  z-index: 31;
+  border: 1px solid var(--border);
+  background: #0c2c28;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  color: #a7f5e9;
+}
+
 .ambient {
   position: fixed;
   inset: 0;
@@ -198,6 +211,7 @@ button {
 .card-actions {
   display: flex;
   gap: 0.45rem;
+  align-items: center;
 }
 
 .feed-card:hover {
@@ -242,6 +256,16 @@ button {
   background: #0a0e1470;
   color: var(--text);
   border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
 }
 
 .alerts-panel {
@@ -419,6 +443,16 @@ button {
     right: 50%;
     transform: translateX(50%);
     top: 0.7rem;
+    max-width: calc(100% - 2rem);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .undo-pill {
+    left: 50%;
+    transform: translateX(-50%);
+    top: 2.6rem;
     max-width: calc(100% - 2rem);
     white-space: nowrap;
     overflow: hidden;
