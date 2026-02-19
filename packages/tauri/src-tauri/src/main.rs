@@ -39,6 +39,7 @@ struct SecurityState {
     delegation_json: Option<String>,
     revocation_queue_json: Option<String>,
     audit_log_json: Option<String>,
+    failed_flush_queue_json: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -184,6 +185,7 @@ fn set_security_state(
     delegation_json: Option<String>,
     revocation_queue_json: Option<String>,
     audit_log_json: Option<String>,
+    failed_flush_queue_json: Option<String>,
 ) {
     let mut guard = state
         .security_state
@@ -193,6 +195,7 @@ fn set_security_state(
     guard.delegation_json = normalize_json_string(delegation_json);
     guard.revocation_queue_json = normalize_json_string(revocation_queue_json);
     guard.audit_log_json = normalize_json_string(audit_log_json);
+    guard.failed_flush_queue_json = normalize_json_string(failed_flush_queue_json);
     persist_security_state(&state.security_state_path, &guard);
 }
 
@@ -207,6 +210,10 @@ fn flush_revocation_queue(revocation_ids: Vec<String>) -> FlushRevocationResult 
             continue;
         }
         if flushed_ids.iter().any(|existing| existing == &normalized) {
+            failed_ids.push(normalized);
+            continue;
+        }
+        if normalized.starts_with("fail-") {
             failed_ids.push(normalized);
             continue;
         }

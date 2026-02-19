@@ -10,6 +10,7 @@ export type SecurityStatePayload = {
   delegationJson: string | null;
   revocationQueueJson: string | null;
   auditLogJson: string | null;
+  failedFlushQueueJson: string | null;
 };
 
 export type FlushRevocationResult = {
@@ -41,7 +42,8 @@ export const saveSecurityStateCommand = async (payload: SecurityStatePayload): P
     identityJson: payload.identityJson,
     delegationJson: payload.delegationJson,
     revocationQueueJson: payload.revocationQueueJson,
-    auditLogJson: payload.auditLogJson
+    auditLogJson: payload.auditLogJson,
+    failedFlushQueueJson: payload.failedFlushQueueJson
   });
 };
 

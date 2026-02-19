@@ -102,6 +102,15 @@
   - audit rows are now clickable and open a dedicated detail modal with event/detail/timestamp/id
   - modal supports escape/overlay close behavior consistent with existing dialogs
   - expanded UI interactions tests for audit detail open/close flow (`8` UI tests passing)
+- Added failed-flush retry queue with backoff metadata:
+  - added core retry helpers in `packages/core/src/index.ts` (`upsert`, `remove`, `split-ready`, parse/serialize)
+  - extended Tauri security-state payload persistence with `failed_flush_queue_json` in `packages/tauri/src-tauri/src/main.rs`
+  - wired UI retry queue state + persistence in `packages/ui/src/App.tsx` and `packages/ui/src/tauri-security-state.ts`
+  - replay flow now moves failed flush IDs into retry metadata and adds `Retry Failed Flushes` action to re-queue ready retries
+  - expanded core tests for retry helper coverage in `packages/core/tests/create-feed-entry.test.ts`
+- Validation status (current environment):
+  - `pnpm test`: blocked (`env: 'node': No such file or directory`)
+  - `pnpm typecheck`: blocked (`env: 'node': No such file or directory`)
 
 ### Phase Tracking
 

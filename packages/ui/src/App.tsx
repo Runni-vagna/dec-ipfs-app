@@ -21,6 +21,7 @@ import {
   formatDidHandle,
   isUcanDelegationExpiringSoon,
   isUcanDelegationExpired,
+  parseFailedRevocationRetries,
   parseOfflineRevocationQueue,
   parseIdentityRecord,
   parseActiveTab,
@@ -28,9 +29,12 @@ import {
   parseImportedFeedState,
   parseSecurityAuditLog,
   replayOfflineRevocations,
+  removeFailedRetries,
   prependFeedPost,
+  splitReadyFailedRetries,
   removeFeedPost,
   restoreFeedPost,
+  serializeFailedRevocationRetries,
   serializeOfflineRevocationQueue,
   serializeIdentityRecord,
   serializeSecurityAuditLog,
@@ -40,11 +44,13 @@ import {
   toggleFlag,
   type ActiveTab,
   type FeedPost,
+  type FailedRevocationRetry,
   type IdentityRecord,
   type OfflineRevocationEntry,
   type RemovedPostSnapshot,
   type SecurityAuditEntry,
-  type UcanDelegationRecord
+  type UcanDelegationRecord,
+  upsertFailedRevocationRetries
 } from "@cidfeed/core";
 import {
   getPrivateNodeStatus,
@@ -80,7 +86,8 @@ const STORAGE_KEYS = {
   identity: "cidfeed.ui.identity",
   ucan: "cidfeed.ui.ucanDelegation",
   revocations: "cidfeed.ui.offlineRevocationQueue",
-  auditLog: "cidfeed.ui.securityAuditLog"
+  auditLog: "cidfeed.ui.securityAuditLog",
+  failedFlushQueue: "cidfeed.ui.failedFlushQueue"
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
@@ -151,6 +158,12 @@ export const App = () => {
       return [];
     }
     return parseSecurityAuditLog(window.localStorage.getItem(STORAGE_KEYS.auditLog));
+  });
+  const [failedFlushQueue, setFailedFlushQueue] = useState<FailedRevocationRetry[]>(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+    return parseFailedRevocationRetries(window.localStorage.getItem(STORAGE_KEYS.failedFlushQueue));
   });
   const [auditFilter, setAuditFilter] = useState<AuditFilter>("all");
   const [auditQuery, setAuditQuery] = useState("");
@@ -418,6 +431,7 @@ export const App = () => {
         setDelegation(parseUcanDelegation(payload.delegationJson));
         setRevocationQueue(parseOfflineRevocationQueue(payload.revocationQueueJson));
         setAuditLog(parseSecurityAuditLog(payload.auditLogJson));
+        setFailedFlushQueue(parseFailedRevocationRetries(payload.failedFlushQueueJson));
       }
       setSecurityHydrated(true);
     })();
@@ -436,6 +450,8 @@ export const App = () => {
     const delegationJson = delegation ? serializeUcanDelegation(delegation) : null;
     const revocationQueueJson = revocationQueue.length > 0 ? serializeOfflineRevocationQueue(revocationQueue) : null;
     const auditLogJson = auditLog.length > 0 ? serializeSecurityAuditLog(auditLog) : null;
+    const failedFlushQueueJson =
+      failedFlushQueue.length > 0 ? serializeFailedRevocationRetries(failedFlushQueue) : null;
 
     if (identityJson) {
       window.localStorage.setItem(STORAGE_KEYS.identity, identityJson);
@@ -457,14 +473,20 @@ export const App = () => {
     } else {
       window.localStorage.removeItem(STORAGE_KEYS.auditLog);
     }
+    if (failedFlushQueueJson) {
+      window.localStorage.setItem(STORAGE_KEYS.failedFlushQueue, failedFlushQueueJson);
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
+    }
 
     void saveSecurityStateCommand({
       identityJson,
       delegationJson,
       revocationQueueJson,
-      auditLogJson
+      auditLogJson,
+      failedFlushQueueJson
     });
-  }, [auditLog, delegation, identity, revocationQueue, securityHydrated]);
+  }, [auditLog, delegation, failedFlushQueue, identity, revocationQueue, securityHydrated]);
 
   useEffect(() => {
     if (activeTab === "alerts" && unreadAlerts > 0) {
@@ -551,6 +573,7 @@ export const App = () => {
     setDelegation(null);
     setRevocationQueue([]);
     setAuditLog([]);
+    setFailedFlushQueue([]);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
     window.localStorage.removeItem(STORAGE_KEYS.posts);
     window.localStorage.removeItem(STORAGE_KEYS.follows);
@@ -560,6 +583,7 @@ export const App = () => {
     window.localStorage.removeItem(STORAGE_KEYS.ucan);
     window.localStorage.removeItem(STORAGE_KEYS.revocations);
     window.localStorage.removeItem(STORAGE_KEYS.auditLog);
+    window.localStorage.removeItem(STORAGE_KEYS.failedFlushQueue);
     setActionNote("Demo state reset.");
   };
 
@@ -797,7 +821,7 @@ export const App = () => {
               </div>
               {delegation && (
                 <p className="muted">
-                  Expires: {new Date(delegation.expiresAt).toLocaleString()} · Revocations queued: {revocationQueue.length}
+                  Expires: {new Date(delegation.expiresAt).toLocaleString()} · Revocations queued: {revocationQueue.length} · Failed flush retries: {failedFlushQueue.length}
                 </p>
               )}
               <div className="alerts-panel">
@@ -962,9 +986,15 @@ export const App = () => {
                       setActionNote(`Replayed ${result.replayed.length} queued revocation(s).`);
                       return;
                     }
-                    const flushedSet = new Set(flushed.flushedIds);
-                    setRevocationQueue((current) =>
-                      current.filter((entry) => !flushedSet.has(entry.revocationId))
+                    const replayedSet = new Set(result.replayed.map((entry) => entry.revocationId));
+                    setRevocationQueue((current) => current.filter((entry) => !replayedSet.has(entry.revocationId)));
+                    setFailedFlushQueue((current) =>
+                      upsertFailedRevocationRetries(
+                        removeFailedRetries(current, flushed.flushedIds),
+                        flushed.failedIds,
+                        Date.now(),
+                        "tauri flush failed"
+                      )
                     );
                     recordSecurityEvent(
                       "revocation.replayed",
@@ -976,6 +1006,38 @@ export const App = () => {
                   })()}
                 >
                   Replay Revocations
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    if (failedFlushQueue.length === 0) {
+                      setActionNote("No failed flush retries queued.");
+                      return;
+                    }
+                    const { ready, pending } = splitReadyFailedRetries(failedFlushQueue, Date.now());
+                    if (ready.length === 0) {
+                      const nextRetryAt = pending.length > 0 ? Math.min(...pending.map((entry) => entry.nextRetryAt)) : null;
+                      setActionNote(
+                        nextRetryAt ? `No retries ready until ${new Date(nextRetryAt).toLocaleTimeString()}.` : "No retries ready."
+                      );
+                      return;
+                    }
+                    setRevocationQueue((current) => {
+                      let next = [...current];
+                      for (const retry of ready) {
+                        next = enqueueOfflineRevocation(
+                          next,
+                          createOfflineRevocationEntry(retry.revocationId, `retry attempt ${retry.retryCount}`)
+                        );
+                      }
+                      return next;
+                    });
+                    setFailedFlushQueue(pending);
+                    recordSecurityEvent("revocation.replayed", `re-queued ${ready.length} failed revoke(s) for replay`);
+                    setActionNote(`Re-queued ${ready.length} failed revocation(s).`);
+                  }}
+                >
+                  Retry Failed Flushes
                 </button>
                 <button className="follow secondary" onClick={resetDemoState}>Reset Demo Data</button>
                 <button className="follow secondary" onClick={exportAuditLog}>

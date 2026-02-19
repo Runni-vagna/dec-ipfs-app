@@ -40,6 +40,13 @@ export type RevocationReplayResult = {
   readonly replayed: OfflineRevocationEntry[];
   readonly remaining: OfflineRevocationEntry[];
 };
+export type FailedRevocationRetry = {
+  readonly revocationId: string;
+  readonly failedAt: number;
+  readonly retryCount: number;
+  readonly nextRetryAt: number;
+  readonly lastError: string;
+};
 export type SecurityAuditEventType =
   | "identity.created"
   | "identity.cleared"
@@ -629,6 +636,135 @@ export const replayOfflineRevocations = (
     replayed,
     remaining
   };
+};
+
+export const createFailedRevocationRetry = (
+  revocationId: string,
+  failedAt: number,
+  retryCount: number,
+  nextRetryAt: number,
+  lastError: string
+): FailedRevocationRetry => {
+  const normalizedId = revocationId.trim();
+  const normalizedError = lastError.trim();
+  if (normalizedId.length === 0) {
+    throw new Error("revocationId must be non-empty");
+  }
+  if (retryCount < 1 || !Number.isFinite(retryCount)) {
+    throw new Error("retryCount must be >= 1");
+  }
+  if (!Number.isFinite(failedAt) || !Number.isFinite(nextRetryAt)) {
+    throw new Error("failedAt and nextRetryAt must be finite numbers");
+  }
+  if (normalizedError.length === 0) {
+    throw new Error("lastError must be non-empty");
+  }
+  return {
+    revocationId: normalizedId,
+    failedAt,
+    retryCount,
+    nextRetryAt,
+    lastError: normalizedError
+  };
+};
+
+export const upsertFailedRevocationRetries = (
+  current: readonly FailedRevocationRetry[],
+  failedIds: readonly string[],
+  now = Date.now(),
+  errorLabel = "flush failed",
+  baseDelayMs = 30_000
+): FailedRevocationRetry[] => {
+  const byId = new Map(current.map((entry) => [entry.revocationId, entry]));
+  for (const rawId of failedIds) {
+    const revocationId = rawId.trim();
+    if (revocationId.length === 0) {
+      continue;
+    }
+    const existing = byId.get(revocationId);
+    const retryCount = existing ? existing.retryCount + 1 : 1;
+    const retryDelay = baseDelayMs * Math.max(1, retryCount);
+    byId.set(
+      revocationId,
+      createFailedRevocationRetry(revocationId, now, retryCount, now + retryDelay, errorLabel)
+    );
+  }
+  return [...byId.values()].sort((left, right) => left.nextRetryAt - right.nextRetryAt);
+};
+
+export const removeFailedRetries = (
+  current: readonly FailedRevocationRetry[],
+  flushedIds: readonly string[]
+): FailedRevocationRetry[] => {
+  if (flushedIds.length === 0) {
+    return [...current];
+  }
+  const flushedSet = new Set(flushedIds.map((id) => id.trim()).filter((id) => id.length > 0));
+  return current.filter((entry) => !flushedSet.has(entry.revocationId));
+};
+
+export const splitReadyFailedRetries = (
+  current: readonly FailedRevocationRetry[],
+  now = Date.now()
+): { ready: FailedRevocationRetry[]; pending: FailedRevocationRetry[] } => {
+  const ready: FailedRevocationRetry[] = [];
+  const pending: FailedRevocationRetry[] = [];
+  for (const entry of current) {
+    if (entry.nextRetryAt <= now) {
+      ready.push(entry);
+    } else {
+      pending.push(entry);
+    }
+  }
+  return { ready, pending };
+};
+
+export const serializeFailedRevocationRetries = (entries: readonly FailedRevocationRetry[]): string => {
+  return JSON.stringify(entries);
+};
+
+export const parseFailedRevocationRetries = (raw: string | null | undefined): FailedRevocationRetry[] => {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  const next: FailedRevocationRetry[] = [];
+  for (const item of parsed) {
+    if (!isObject(item)) {
+      continue;
+    }
+    const revocationId = typeof item.revocationId === "string" ? item.revocationId.trim() : "";
+    const failedAt = typeof item.failedAt === "number" ? item.failedAt : NaN;
+    const retryCount = typeof item.retryCount === "number" ? item.retryCount : NaN;
+    const nextRetryAt = typeof item.nextRetryAt === "number" ? item.nextRetryAt : NaN;
+    const lastError = typeof item.lastError === "string" ? item.lastError.trim() : "";
+    if (
+      revocationId.length === 0 ||
+      !Number.isFinite(failedAt) ||
+      !Number.isFinite(retryCount) ||
+      retryCount < 1 ||
+      !Number.isFinite(nextRetryAt) ||
+      lastError.length === 0
+    ) {
+      continue;
+    }
+    next.push({
+      revocationId,
+      failedAt,
+      retryCount: Math.floor(retryCount),
+      nextRetryAt,
+      lastError
+    });
+  }
+  return next.sort((left, right) => left.nextRetryAt - right.nextRetryAt);
 };
 
 export const createSecurityAuditEntry = (

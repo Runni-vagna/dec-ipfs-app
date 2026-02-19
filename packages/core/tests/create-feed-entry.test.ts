@@ -26,6 +26,7 @@ import {
   isUcanDelegationExpired,
   isValidDidKey,
   parseOfflineRevocationQueue,
+  parseFailedRevocationRetries,
   parseSecurityAuditLog,
   replayOfflineRevocations,
   parseIdentityRecord,
@@ -34,14 +35,18 @@ import {
   parseImportedFeedState,
   prependFeedPost,
   removeFeedPost,
+  removeFailedRetries,
   restoreFeedPost,
+  serializeFailedRevocationRetries,
   serializeOfflineRevocationQueue,
   serializeSecurityAuditLog,
   serializeIdentityRecord,
   serializeUcanDelegation,
   serializeFeedStateSnapshot,
+  splitReadyFailedRetries,
   toFeedPost,
-  toggleFlag
+  toggleFlag,
+  upsertFailedRevocationRetries
 } from "../src";
 
 describe("createFeedEntry", () => {
@@ -311,5 +316,33 @@ describe("security audit log helpers", () => {
     expect(parsed).toHaveLength(1);
     expect(parsed[0]?.event).toBe("revocation.replayed");
     expect(parseSecurityAuditLog("bad-json")).toHaveLength(0);
+  });
+});
+
+describe("failed revocation retry helpers", () => {
+  it("upserts failed ids and removes flushed ids", () => {
+    const first = upsertFailedRevocationRetries([], ["revoke-a"], 1000, "network", 10_000);
+    expect(first).toHaveLength(1);
+    expect(first[0]?.retryCount).toBe(1);
+    const second = upsertFailedRevocationRetries(first, ["revoke-a", "revoke-b"], 2000, "network", 10_000);
+    expect(second).toHaveLength(2);
+    const updatedA = second.find((entry) => entry.revocationId === "revoke-a");
+    expect(updatedA?.retryCount).toBe(2);
+
+    const removed = removeFailedRetries(second, ["revoke-a"]);
+    expect(removed).toHaveLength(1);
+    expect(removed[0]?.revocationId).toBe("revoke-b");
+  });
+
+  it("splits ready retries and supports parse/serialize", () => {
+    const base = upsertFailedRevocationRetries([], ["revoke-a", "revoke-b"], 1000, "network", 10_000);
+    const split = splitReadyFailedRetries(base, 15_000);
+    expect(split.ready).toHaveLength(2);
+    expect(split.pending).toHaveLength(0);
+
+    const raw = serializeFailedRevocationRetries(base);
+    const parsed = parseFailedRevocationRetries(raw);
+    expect(parsed).toHaveLength(2);
+    expect(parseFailedRevocationRetries("bad-json")).toHaveLength(0);
   });
 });
