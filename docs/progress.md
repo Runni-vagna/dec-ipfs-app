@@ -21,6 +21,14 @@
 - CI hardening (after first public run):
   - expanded Linux Tauri dependency install list (`build-essential`, `pkg-config`, `libssl-dev`, `libglib2.0-dev`, `libxdo-dev`)
   - added `tauri-build.log` artifact upload (`if: always()`) for actionable failure diagnostics
+- Integrated shared feed-domain utilities from `packages/core` into the UI publish flow:
+  - added deterministic local CID generation utility in `packages/core/src/index.ts`
+  - added draft-post builder aligned with feed entry schema v1.1
+  - wired `packages/ui/src/App.tsx` compose publish action to use core-generated CID + timestamp instead of ad-hoc UI-only IDs
+  - expanded core test coverage to include CID generation and draft-post creation
+- Validation status (latest):
+  - `pnpm test`: pass
+  - `pnpm typecheck`: pass
 
 ### Phase Tracking
 

@@ -32,6 +32,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@cidfeed/core':
+        specifier: workspace:*
+        version: link:../core
       lucide-react:
         specifier: 0.468.0
         version: 0.468.0(react@19.0.0)

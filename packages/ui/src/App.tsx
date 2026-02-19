@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Bell, CircleHelp, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
+import { createDraftPost } from "@cidfeed/core";
 
 type Tab = "main" | "discover" | "private" | "alerts" | "profile";
 
@@ -14,6 +15,7 @@ type FeedItem = {
   cid: string;
   body: string;
   tag: Tab | "all";
+  timestamp: number;
 };
 
 type WizardMode = "easy" | "private" | null;
@@ -32,10 +34,10 @@ const STORAGE_KEYS = {
 } as const;
 
 const DEFAULT_POSTS: FeedItem[] = [
-  { cid: "bafybeigd", body: "CIDFeed content sharing post", tag: "main" },
-  { cid: "bafybeih2", body: "Swarm update: private peers online", tag: "private" },
-  { cid: "bafybeiak", body: "OrbitDB sync in 642ms", tag: "discover" },
-  { cid: "bafybeip7", body: "Published immutable post CID", tag: "alerts" }
+  { cid: "bafybeigd", body: "CIDFeed content sharing post", tag: "main", timestamp: 1700000000000 },
+  { cid: "bafybeih2", body: "Swarm update: private peers online", tag: "private", timestamp: 1700000001000 },
+  { cid: "bafybeiak", body: "OrbitDB sync in 642ms", tag: "discover", timestamp: 1700000002000 },
+  { cid: "bafybeip7", body: "Published immutable post CID", tag: "alerts", timestamp: 1700000003000 }
 ];
 
 const parseTab = (value: string | null): Tab => {
@@ -133,15 +135,15 @@ export const App = () => {
     if (trimmed.length === 0) {
       return;
     }
-    const stamp = Date.now().toString(36);
+    const post = createDraftPost(trimmed, activeTab);
     setPosts((current) => [
-      { cid: `bafy${stamp.slice(0, 5)}`, body: trimmed, tag: activeTab },
+      { cid: post.cid, body: post.body, tag: activeTab, timestamp: post.timestamp },
       ...current
     ]);
     if (activeTab !== "alerts") {
       setUnreadAlerts((count) => count + 1);
     }
-    setActionNote("Post published to local mock feed.");
+    setActionNote(`Post published with CID ${post.cid}.`);
     setDraft("");
     setComposeOpen(false);
   };
