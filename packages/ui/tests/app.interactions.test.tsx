@@ -240,6 +240,21 @@ describe("App interactions", () => {
     expect(await screen.findByText(/Replayed 1 queued revocation\(s\)\./i)).toBeTruthy();
   });
 
+  it("cancels active unsafe replay override immediately", () => {
+    const now = Date.now();
+    window.localStorage.setItem("cidfeed.ui.unsafeReplayOverrideUntil", String(now + 5 * 60_000));
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+
+    expect(screen.getByRole("button", { name: "Cancel Unsafe Override" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Unsafe Override" }));
+
+    expect(screen.getByText("Temporary unsafe replay override cancelled.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Cancel Unsafe Override" })).toBeNull();
+    expect(screen.getByText("revocation.verified")).toBeTruthy();
+  });
+
   it("shows revoked status when delegation revocation id exists in revocation list", () => {
     const now = Date.now();
     window.localStorage.setItem(

@@ -174,6 +174,10 @@
   - override button is disabled during active window to prevent accidental re-arming
   - profile warning line now includes override remaining countdown
   - expanded UI tests to assert active override button is disabled
+- Added explicit override cancellation control:
+  - profile now shows `Cancel Unsafe Override` while temporary override is active
+  - cancel action clears override immediately, restores strict safe replay behavior, and records an audit entry
+  - expanded UI tests for immediate override cancellation flow
 
 ### Phase Tracking
 

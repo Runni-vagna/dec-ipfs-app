@@ -1355,11 +1355,25 @@ export const App = () => {
                     : "Temporarily Allow Unsafe Replay (5m)"}
                 </button>
                 {unsafeReplayOverrideActive && (
-                  <div className="alert-row">
-                    <span>
-                      Unsafe replay override active until {new Date(unsafeReplayOverrideUntil ?? 0).toLocaleTimeString()} (remaining {unsafeReplayOverrideRemaining ?? "00:00"}).
-                    </span>
-                  </div>
+                  <>
+                    <div className="alert-row">
+                      <span>
+                        Unsafe replay override active until {new Date(unsafeReplayOverrideUntil ?? 0).toLocaleTimeString()} (remaining {unsafeReplayOverrideRemaining ?? "00:00"}).
+                      </span>
+                    </div>
+                    <div className="alert-row">
+                      <button
+                        className="follow secondary"
+                        onClick={() => {
+                          setUnsafeReplayOverrideUntil(null);
+                          recordSecurityEvent("revocation.verified", "temporary unsafe replay override cancelled");
+                          setActionNote("Temporary unsafe replay override cancelled.");
+                        }}
+                      >
+                        Cancel Unsafe Override
+                      </button>
+                    </div>
+                  </>
                 )}
                 <button
                   className="follow secondary"
