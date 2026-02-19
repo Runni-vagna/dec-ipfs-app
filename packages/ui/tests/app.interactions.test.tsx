@@ -68,5 +68,8 @@ describe("App interactions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Revoke UCAN" }));
     expect(screen.getByText("Delegate Access")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Replay Revocations" }));
+    expect(screen.getByText(/Replayed 1 queued revocation\(s\)\./i)).toBeTruthy();
   });
 });

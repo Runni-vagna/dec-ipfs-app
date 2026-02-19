@@ -36,6 +36,10 @@ export type OfflineRevocationEntry = {
   readonly queuedAt: number;
   readonly reason: string;
 };
+export type RevocationReplayResult = {
+  readonly replayed: OfflineRevocationEntry[];
+  readonly remaining: OfflineRevocationEntry[];
+};
 
 export const createFeedEntry = (postCID: string, timestamp = Date.now()): FeedEntry => {
   if (postCID.trim().length === 0) {
@@ -583,4 +587,17 @@ export const parseOfflineRevocationQueue = (raw: string | null | undefined): Off
     queue.push({ revocationId, reason, queuedAt });
   }
   return queue;
+};
+
+export const replayOfflineRevocations = (
+  queue: readonly OfflineRevocationEntry[],
+  maxBatch = 25
+): RevocationReplayResult => {
+  const safeBatch = Number.isFinite(maxBatch) && maxBatch > 0 ? Math.floor(maxBatch) : queue.length;
+  const replayed = queue.slice(0, safeBatch);
+  const remaining = queue.slice(safeBatch);
+  return {
+    replayed,
+    remaining
+  };
 };

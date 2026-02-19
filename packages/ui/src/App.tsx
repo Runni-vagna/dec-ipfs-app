@@ -23,6 +23,7 @@ import {
   parseActiveTab,
   parseUcanDelegation,
   parseImportedFeedState,
+  replayOfflineRevocations,
   prependFeedPost,
   removeFeedPost,
   restoreFeedPost,
@@ -733,6 +734,20 @@ export const App = () => {
                   }}
                 >
                   Revoke UCAN
+                </button>
+                <button
+                  className="follow secondary"
+                  onClick={() => {
+                    const result = replayOfflineRevocations(revocationQueue, 50);
+                    setRevocationQueue(result.remaining);
+                    if (result.replayed.length === 0) {
+                      setActionNote("No queued revocations to replay.");
+                      return;
+                    }
+                    setActionNote(`Replayed ${result.replayed.length} queued revocation(s).`);
+                  }}
+                >
+                  Replay Revocations
                 </button>
                 <button className="follow secondary" onClick={resetDemoState}>Reset Demo Data</button>
                 <button className="follow secondary" onClick={exportDemoState}>

@@ -66,6 +66,10 @@
   - profile actions now support `Create UCAN` (delegation with explicit expiry) and `Revoke UCAN` (enqueue offline revocation entry + clear active delegation)
   - profile panel now shows UCAN active/expired status, expiry timestamp, and queued revocation count
   - expanded UI interactions tests to cover UCAN create/revoke flow (`5` UI tests passing)
+- Added offline revocation replay flow:
+  - added `replayOfflineRevocations` batch helper in `packages/core/src/index.ts`
+  - wired `Replay Revocations` profile action in `packages/ui/src/App.tsx` to drain queue and report replay count
+  - expanded core and UI tests to cover replay behavior (`20` core tests passing; `5` UI tests passing)
 
 ### Phase Tracking
 

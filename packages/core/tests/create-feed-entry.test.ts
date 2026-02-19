@@ -22,6 +22,7 @@ import {
   isUcanDelegationExpired,
   isValidDidKey,
   parseOfflineRevocationQueue,
+  replayOfflineRevocations,
   parseIdentityRecord,
   parseActiveTab,
   parseUcanDelegation,
@@ -266,5 +267,21 @@ describe("ucan and revocation helpers", () => {
     expect(parsed[0]?.revocationId).toBe("revoke-1");
     expect(parsed[0]?.reason).toBe("key compromise");
     expect(parseOfflineRevocationQueue("bad-json")).toHaveLength(0);
+  });
+
+  it("replays queue entries in batches", () => {
+    const first = createOfflineRevocationEntry("revoke-a", "test-a", 1);
+    const second = createOfflineRevocationEntry("revoke-b", "test-b", 2);
+    const third = createOfflineRevocationEntry("revoke-c", "test-c", 3);
+    const queue = [first, second, third];
+
+    const partial = replayOfflineRevocations(queue, 2);
+    expect(partial.replayed).toHaveLength(2);
+    expect(partial.remaining).toHaveLength(1);
+    expect(partial.remaining[0]?.revocationId).toBe("revoke-c");
+
+    const full = replayOfflineRevocations(partial.remaining, 10);
+    expect(full.replayed).toHaveLength(1);
+    expect(full.remaining).toHaveLength(0);
   });
 });
