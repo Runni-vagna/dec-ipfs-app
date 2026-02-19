@@ -1,0 +1,51 @@
+/**
+ * SDP v1.1 Phase 0 • Test
+ * Model-agnostic implementation
+ * Security reference: docs/threat-model.md §Baseline Controls
+ * Immutability: CIDs are permanent
+ */
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { App } from "../src/App";
+
+describe("App interactions", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("switches tabs and shows discover feed content", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Discover" }));
+
+    expect(screen.getByText("Discover Feed")).toBeTruthy();
+    expect(screen.getByText(/OrbitDB sync in 642ms/i)).toBeTruthy();
+  });
+
+  it("publishes a mock post from compose modal", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getAllByLabelText("Compose")[0]);
+    fireEvent.change(screen.getByPlaceholderText("Write immutable CID content..."), {
+      target: { value: "Test post from vitest" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Publish Mock Post" }));
+
+    expect(screen.getByText(/Test post from vitest/i)).toBeTruthy();
+  });
+
+  it("opens help with ? keyboard shortcut and closes with Escape", () => {
+    render(<App />);
+
+    fireEvent.keyDown(window, { key: "?" });
+    expect(screen.getByText("Help & Shortcuts")).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByText("Help & Shortcuts")).toBeNull();
+  });
+});
