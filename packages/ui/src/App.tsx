@@ -8,13 +8,19 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Bell, CircleHelp, Compass, Download, Home, Plus, Search, Shield, Trash2, Upload, User, X } from "lucide-react";
 import {
+  createFeedStateSnapshot,
+  createResetFeedState,
   createDraftPost,
   filterFeedPosts,
+  parseActiveTab,
+  parseImportedFeedState,
   prependFeedPost,
   removeFeedPost,
   restoreFeedPost,
+  serializeFeedStateSnapshot,
   toFeedPost,
   toggleFlag,
+  type ActiveTab,
   type FeedPost,
   type RemovedPostSnapshot
 } from "@cidfeed/core";
@@ -26,7 +32,7 @@ import {
   type PrivateNodeStatus
 } from "./tauri-private-node";
 
-type Tab = "main" | "discover" | "private" | "alerts" | "profile";
+type Tab = ActiveTab;
 
 type FeedItem = FeedPost;
 
@@ -49,20 +55,13 @@ const DEFAULT_POSTS: FeedItem[] = [
   { cid: "bafybeip7", body: "Published immutable post CID", tag: "alerts", timestamp: 1700000003000 }
 ];
 
-const parseTab = (value: string | null): Tab => {
-  if (value === "main" || value === "discover" || value === "private" || value === "alerts" || value === "profile") {
-    return value;
-  }
-  return "main";
-};
-
 export const App = () => {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (typeof window === "undefined") {
       return "main";
     }
-    return parseTab(window.localStorage.getItem(STORAGE_KEYS.tab));
+    return parseActiveTab(window.localStorage.getItem(STORAGE_KEYS.tab));
   });
   const [isSearchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -167,15 +166,14 @@ export const App = () => {
   };
 
   const exportDemoState = () => {
-    const payload = {
-      exportedAt: new Date().toISOString(),
+    const payload = createFeedStateSnapshot({
       activeTab,
       unreadAlerts,
       followedCids,
       pinnedCids,
       posts
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    });
+    const blob = new Blob([serializeFeedStateSnapshot(payload)], { type: "application/json" });
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -243,22 +241,20 @@ export const App = () => {
     }
     try {
       const text = await file.text();
-      const payload = JSON.parse(text) as {
-        activeTab?: string;
-        unreadAlerts?: number;
-        followedCids?: Record<string, boolean>;
-        pinnedCids?: Record<string, boolean>;
-        posts?: FeedItem[];
-      };
-      setActiveTab(parseTab(payload.activeTab ?? "main"));
-      setUnreadAlerts(typeof payload.unreadAlerts === "number" ? Math.max(0, payload.unreadAlerts) : 0);
-      setFollowedCids(payload.followedCids ?? {});
-      setPinnedCids(payload.pinnedCids ?? {});
-      setPosts(Array.isArray(payload.posts) && payload.posts.length > 0 ? payload.posts : DEFAULT_POSTS);
+      const parsed = parseImportedFeedState(text, DEFAULT_POSTS);
+      setActiveTab(parsed.activeTab);
+      setUnreadAlerts(parsed.unreadAlerts);
+      setFollowedCids(parsed.followedCids);
+      setPinnedCids(parsed.pinnedCids);
+      setPosts(parsed.posts);
       setPinnedOnly(false);
       setActionNote("Demo state imported.");
-    } catch {
-      setActionNote("Import failed: invalid JSON.");
+    } catch (error) {
+      if (error instanceof Error) {
+        setActionNote(error.message);
+      } else {
+        setActionNote("Import failed: invalid JSON.");
+      }
     } finally {
       event.target.value = "";
     }
@@ -344,19 +340,20 @@ export const App = () => {
   }, []);
 
   const resetDemoState = () => {
-    setActiveTab("main");
+    const reset = createResetFeedState(DEFAULT_POSTS);
+    setActiveTab(reset.activeTab);
     setSearchOpen(false);
     setQuery("");
-    setFollowedCids({});
-    setPinnedCids({});
+    setFollowedCids(reset.followedCids);
+    setPinnedCids(reset.pinnedCids);
     setWizardOpen(false);
     setComposeOpen(false);
     setHelpOpen(false);
     setPrivateNodeOnline(false);
     setPeerCount(0);
     setDraft("");
-    setUnreadAlerts(0);
-    setPosts(DEFAULT_POSTS);
+    setUnreadAlerts(reset.unreadAlerts);
+    setPosts(reset.posts);
     window.localStorage.removeItem(STORAGE_KEYS.tab);
     window.localStorage.removeItem(STORAGE_KEYS.posts);
     window.localStorage.removeItem(STORAGE_KEYS.follows);

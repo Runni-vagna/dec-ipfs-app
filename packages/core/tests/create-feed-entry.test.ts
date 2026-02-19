@@ -7,13 +7,18 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  createFeedStateSnapshot,
+  createResetFeedState,
   createDraftPost,
   createFeedEntry,
   createLocalCID,
   filterFeedPosts,
+  parseActiveTab,
+  parseImportedFeedState,
   prependFeedPost,
   removeFeedPost,
   restoreFeedPost,
+  serializeFeedStateSnapshot,
   toFeedPost,
   toggleFlag
 } from "../src";
@@ -111,5 +116,56 @@ describe("feed helpers", () => {
     const filteredQuery = filterFeedPosts(posts, "discover", "node", false, {});
     expect(filteredQuery).toHaveLength(1);
     expect(filteredQuery[0]?.cid).toBe(b.cid);
+  });
+});
+
+describe("feed state serialization", () => {
+  const defaults = [toFeedPost(createDraftPost("default", "main", 100))];
+
+  it("creates reset state and parses active tab safely", () => {
+    const state = createResetFeedState(defaults);
+    expect(state.activeTab).toBe("main");
+    expect(state.posts).toHaveLength(1);
+    expect(parseActiveTab("alerts")).toBe("alerts");
+    expect(parseActiveTab("all")).toBe("main");
+    expect(parseActiveTab(null)).toBe("main");
+  });
+
+  it("serializes and parses imported snapshot", () => {
+    const state = {
+      activeTab: "discover" as const,
+      unreadAlerts: 3,
+      followedCids: { abc: true },
+      pinnedCids: { def: true },
+      posts: [toFeedPost(createDraftPost("imported", "discover", 200))]
+    };
+    const snapshot = createFeedStateSnapshot(state, "2026-02-19T00:00:00.000Z");
+    const raw = serializeFeedStateSnapshot(snapshot);
+    const parsed = parseImportedFeedState(raw, defaults);
+
+    expect(parsed.activeTab).toBe("discover");
+    expect(parsed.unreadAlerts).toBe(3);
+    expect(parsed.followedCids.abc).toBe(true);
+    expect(parsed.pinnedCids.def).toBe(true);
+    expect(parsed.posts[0]?.body).toBe("imported");
+  });
+
+  it("falls back to defaults and rejects invalid json", () => {
+    const parsed = parseImportedFeedState(
+      JSON.stringify({
+        activeTab: "main",
+        unreadAlerts: -2,
+        followedCids: { ok: true, nope: "x" },
+        pinnedCids: { p1: true, p2: 1 },
+        posts: [{ bad: true }]
+      }),
+      defaults
+    );
+
+    expect(parsed.unreadAlerts).toBe(0);
+    expect(parsed.followedCids.ok).toBe(true);
+    expect(parsed.pinnedCids.p1).toBe(true);
+    expect(parsed.posts[0]?.body).toBe("default");
+    expect(() => parseImportedFeedState("not json", defaults)).toThrow("Import failed: invalid JSON.");
   });
 });

@@ -39,6 +39,11 @@
   - added reusable operations in `packages/core/src/index.ts` for post conversion, prepend, filter, remove/restore, and boolean flag toggles
   - updated UI feed actions in `packages/ui/src/App.tsx` to call core helpers for publish/filter/pin/follow/remove/undo
   - expanded core tests to cover these flows (`9` tests passing in core suite)
+- Consolidated profile-state import/export/reset logic into core domain helpers:
+  - added active-tab parsing + feed UI state/snapshot helpers in `packages/core/src/index.ts`
+  - added strict JSON import parser with fallback behavior for invalid or empty post payloads
+  - updated `packages/ui/src/App.tsx` profile tools to call shared core state helpers instead of direct UI JSON handling
+  - expanded core tests for snapshot serialization and import/reset behavior (`12` tests passing in core suite)
 
 ### Phase Tracking
 

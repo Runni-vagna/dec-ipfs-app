@@ -11,7 +11,8 @@ export type FeedEntry = {
   readonly version: "1.1";
 };
 
-export type FeedTab = "main" | "discover" | "private" | "alerts" | "profile" | "all";
+export type ActiveTab = "main" | "discover" | "private" | "alerts" | "profile";
+export type FeedTab = ActiveTab | "all";
 
 export const createFeedEntry = (postCID: string, timestamp = Date.now()): FeedEntry => {
   if (postCID.trim().length === 0) {
@@ -148,4 +149,125 @@ export const filterFeedPosts = (
   return pinFiltered.filter(
     (post) => post.cid.toLowerCase().includes(lowered) || post.body.toLowerCase().includes(lowered)
   );
+};
+
+export type FeedUiState = {
+  readonly activeTab: ActiveTab;
+  readonly unreadAlerts: number;
+  readonly followedCids: Record<string, boolean>;
+  readonly pinnedCids: Record<string, boolean>;
+  readonly posts: FeedPost[];
+};
+
+export type FeedStateSnapshot = FeedUiState & {
+  readonly exportedAt: string;
+};
+
+const isObject = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null;
+};
+
+const isFeedTab = (value: string): value is FeedTab => {
+  return value === "main" || value === "discover" || value === "private" || value === "alerts" || value === "profile" || value === "all";
+};
+
+const isActiveTab = (value: string): value is ActiveTab => {
+  return value === "main" || value === "discover" || value === "private" || value === "alerts" || value === "profile";
+};
+
+const isFeedPost = (value: unknown): value is FeedPost => {
+  if (!isObject(value)) {
+    return false;
+  }
+  const { cid, body, tag, timestamp } = value;
+  return (
+    typeof cid === "string" &&
+    cid.trim().length > 0 &&
+    typeof body === "string" &&
+    body.trim().length > 0 &&
+    typeof tag === "string" &&
+    isFeedTab(tag) &&
+    typeof timestamp === "number" &&
+    Number.isFinite(timestamp)
+  );
+};
+
+const normalizeFlagMap = (value: unknown): Record<string, boolean> => {
+  if (!isObject(value)) {
+    return {};
+  }
+  const next: Record<string, boolean> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (entry === true) {
+      next[key] = true;
+    }
+  }
+  return next;
+};
+
+export const parseActiveTab = (value: string | null | undefined, fallback: ActiveTab = "main"): ActiveTab => {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  if (isActiveTab(value)) {
+    return value;
+  }
+  return fallback;
+};
+
+export const createResetFeedState = (defaultPosts: readonly FeedPost[]): FeedUiState => {
+  return {
+    activeTab: "main",
+    unreadAlerts: 0,
+    followedCids: {},
+    pinnedCids: {},
+    posts: [...defaultPosts]
+  };
+};
+
+export const createFeedStateSnapshot = (state: FeedUiState, exportedAt = new Date().toISOString()): FeedStateSnapshot => {
+  return {
+    exportedAt,
+    activeTab: state.activeTab,
+    unreadAlerts: state.unreadAlerts,
+    followedCids: { ...state.followedCids },
+    pinnedCids: { ...state.pinnedCids },
+    posts: [...state.posts]
+  };
+};
+
+export const serializeFeedStateSnapshot = (snapshot: FeedStateSnapshot): string => {
+  return JSON.stringify(snapshot, null, 2);
+};
+
+export const parseImportedFeedState = (raw: string, defaultPosts: readonly FeedPost[]): FeedUiState => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Import failed: invalid JSON.");
+  }
+  if (!isObject(parsed)) {
+    throw new Error("Import failed: invalid JSON.");
+  }
+
+  const activeTab = parseActiveTab(typeof parsed.activeTab === "string" ? parsed.activeTab : null);
+  const unreadAlerts =
+    typeof parsed.unreadAlerts === "number" && Number.isFinite(parsed.unreadAlerts) && parsed.unreadAlerts >= 0
+      ? Math.floor(parsed.unreadAlerts)
+      : 0;
+
+  const followedCids = normalizeFlagMap(parsed.followedCids);
+  const pinnedCids = normalizeFlagMap(parsed.pinnedCids);
+
+  const importedPosts = Array.isArray(parsed.posts) ? parsed.posts.filter((entry): entry is FeedPost => isFeedPost(entry)) : [];
+  const posts = importedPosts.length > 0 ? importedPosts : [...defaultPosts];
+
+  return {
+    activeTab,
+    unreadAlerts,
+    followedCids,
+    pinnedCids,
+    posts
+  };
 };
