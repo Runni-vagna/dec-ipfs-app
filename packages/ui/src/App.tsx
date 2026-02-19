@@ -276,6 +276,22 @@ export const App = () => {
     () => verifyRevocationListPolicy(revocationList, trustedRevocationIssuers),
     [revocationList, trustedRevocationIssuers]
   );
+  const securityWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    if (revocationList.entries.length > 0 && revocationListPolicyStatus === "invalid-signature") {
+      warnings.push("Revocation list signature is invalid. Treat revocation results as untrusted.");
+    }
+    if (revocationList.entries.length > 0 && revocationListPolicyStatus === "untrusted-issuer") {
+      warnings.push("Revocation list issuer is not trusted. Verify issuer DID before accepting list.");
+    }
+    if (failedFlushQueue.length > 0) {
+      warnings.push(`Failed revocation flush queue has ${failedFlushQueue.length} pending item(s).`);
+    }
+    if (revocationQueue.length > 25) {
+      warnings.push(`Offline revocation queue backlog is ${revocationQueue.length}. Replay soon.`);
+    }
+    return warnings;
+  }, [failedFlushQueue.length, revocationList.entries.length, revocationListPolicyStatus, revocationQueue.length]);
 
   const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
     { id: "main", label: "Main", icon: <Home size={16} /> },
@@ -923,6 +939,21 @@ export const App = () => {
                   </p>
                 </>
               )}
+              <div className="alerts-panel">
+                <h3>Security Warnings</h3>
+                <div className="alerts-list">
+                  {securityWarnings.length === 0 && (
+                    <div className="alert-row">
+                      <span className="muted">No active security warnings.</span>
+                    </div>
+                  )}
+                  {securityWarnings.map((warning) => (
+                    <div className="alert-row" key={warning}>
+                      <span>{warning}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="alerts-panel">
                 <h3>Security Audit</h3>
                 <div className="search-wrap">

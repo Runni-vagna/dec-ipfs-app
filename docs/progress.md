@@ -136,6 +136,10 @@
   - extended Tauri security-state schema with `trusted_revocation_issuers_json`
   - wired UI persistence + profile controls for `Trust Issuer` / `Untrust Issuer`
   - profile now displays revocation-list policy status and UI tests cover policy transition to `valid` after trusting issuer
+- Added offline replay risk visibility:
+  - profile now includes a `Security Warnings` panel in `packages/ui/src/App.tsx` for invalid revocation signatures, untrusted issuers, failed flush retries, and replay backlog
+  - expanded UI tests to cover invalid revocation signature warning path in `packages/ui/tests/app.interactions.test.tsx`
+  - updated `risk-register.md` and `docs/risk-register.md` with R6-R8 replay/trust/tamper risks and mitigations
 
 ### Phase Tracking
 

@@ -37,3 +37,4 @@ CIDFeed identity, feed publication, replication, and private-swarm onboarding.
 - Compose publish flow now blocks when delegation verification returns `revoked` or `expired`.
 - Revocation-list signing and integrity verification scaffolding added (`issuerDid` + deterministic signature check) with profile controls to sign/verify list state.
 - Trust policy added for revocation-list issuer verification (`valid` / `untrusted-issuer` / `invalid-signature`) with explicit issuer trust controls in profile.
+- Profile now surfaces security warnings when revocation policy is unsafe (`invalid-signature`/`untrusted-issuer`) or replay queues accumulate.

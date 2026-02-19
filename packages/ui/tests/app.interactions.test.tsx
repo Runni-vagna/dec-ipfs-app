@@ -249,4 +249,36 @@ describe("App interactions", () => {
     expect(screen.getByText("Revocation list issuer trusted.")).toBeTruthy();
     expect(screen.getByText("Revocation list policy: valid")).toBeTruthy();
   });
+
+  it("shows warning when revocation list signature is invalid", () => {
+    const now = Date.now();
+    window.localStorage.setItem(
+      "cidfeed.ui.ucanDelegation",
+      JSON.stringify({
+        issuerDid: "did:key:z123456789ABCDEFGHJKLMN",
+        audienceDid: "did:key:z123456789ABCDEFGHJKLMP",
+        capabilities: [{ with: "did:key:z123456789ABCDEFGHJKLMN", can: "feed/publish" }],
+        issuedAt: now - 1000,
+        expiresAt: now + 3600_000,
+        revocationId: "revoke-untrusted-1",
+        nonce: "abc123",
+        version: "1.1"
+      })
+    );
+    window.localStorage.setItem(
+      "cidfeed.ui.revocationList",
+      JSON.stringify({
+        version: "1.1",
+        updatedAt: now,
+        issuerDid: "did:key:z123456789ABCDEFGHJKLMN",
+        signature: `sig-${now}`,
+        entries: [{ revocationId: "revoke-untrusted-1", revokedAt: now, reason: "test marker" }]
+      })
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+
+    expect(screen.getByText(/Revocation list signature is invalid/i)).toBeTruthy();
+  });
 });
