@@ -74,6 +74,10 @@
   - added `get_security_state` / `set_security_state` commands in `packages/tauri/src-tauri/src/main.rs` with persisted `security-state.json`
   - added UI Tauri bridge module `packages/ui/src/tauri-security-state.ts`
   - updated `packages/ui/src/App.tsx` to hydrate security state from Tauri on startup and persist updates to both Tauri storage and local fallback storage
+- Added UCAN expiry safety UX + auto-revoke queueing:
+  - core now exposes remaining-time/expiring-soon helpers for delegations
+  - profile panel now surfaces `UCAN Expiring Soon` status before expiry
+  - expired delegations are automatically queued for offline revocation replay and cleared from active delegation state
 
 ### Phase Tracking
 

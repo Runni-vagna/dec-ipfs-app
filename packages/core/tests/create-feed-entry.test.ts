@@ -19,6 +19,8 @@ import {
   enqueueOfflineRevocation,
   filterFeedPosts,
   formatDidHandle,
+  getUcanRemainingMs,
+  isUcanDelegationExpiringSoon,
   isUcanDelegationExpired,
   isValidDidKey,
   parseOfflineRevocationQueue,
@@ -225,6 +227,9 @@ describe("ucan and revocation helpers", () => {
     expect(delegation.revocationId.startsWith("revoke-")).toBe(true);
     expect(isUcanDelegationExpired(delegation, 1700000119000)).toBe(false);
     expect(isUcanDelegationExpired(delegation, 1700000120000)).toBe(true);
+    expect(getUcanRemainingMs(delegation, 1700000119000)).toBe(1000);
+    expect(isUcanDelegationExpiringSoon(delegation, 5000, 1700000119000)).toBe(true);
+    expect(isUcanDelegationExpiringSoon(delegation, 500, 1700000119000)).toBe(false);
   });
 
   it("serializes and parses delegation", () => {

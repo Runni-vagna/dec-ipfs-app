@@ -459,6 +459,22 @@ export const isUcanDelegationExpired = (
   return now >= delegation.expiresAt;
 };
 
+export const getUcanRemainingMs = (
+  delegation: Pick<UcanDelegationRecord, "expiresAt">,
+  now = Date.now()
+): number => {
+  return delegation.expiresAt - now;
+};
+
+export const isUcanDelegationExpiringSoon = (
+  delegation: Pick<UcanDelegationRecord, "expiresAt">,
+  thresholdMs = 5 * 60 * 1000,
+  now = Date.now()
+): boolean => {
+  const remainingMs = getUcanRemainingMs(delegation, now);
+  return remainingMs > 0 && remainingMs <= thresholdMs;
+};
+
 export const serializeUcanDelegation = (delegation: UcanDelegationRecord): string => {
   return JSON.stringify(delegation);
 };

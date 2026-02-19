@@ -17,6 +17,7 @@ import {
   enqueueOfflineRevocation,
   filterFeedPosts,
   formatDidHandle,
+  isUcanDelegationExpiringSoon,
   isUcanDelegationExpired,
   parseOfflineRevocationQueue,
   parseIdentityRecord,
@@ -134,6 +135,7 @@ export const App = () => {
     return parseOfflineRevocationQueue(window.localStorage.getItem(STORAGE_KEYS.revocations));
   });
   const [securityHydrated, setSecurityHydrated] = useState(false);
+  const [timeTick, setTimeTick] = useState(() => Date.now());
   const [privateNodeOnline, setPrivateNodeOnline] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
   const [draft, setDraft] = useState("");
@@ -356,6 +358,11 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
+    const timer = window.setInterval(() => setTimeTick(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     if (!securityHydrated) {
       return;
     }
@@ -392,6 +399,19 @@ export const App = () => {
       setActionNote("Alerts marked as read.");
     }
   }, [activeTab, unreadAlerts]);
+
+  useEffect(() => {
+    if (!delegation) {
+      return;
+    }
+    if (!isUcanDelegationExpired(delegation, timeTick)) {
+      return;
+    }
+    const entry = createOfflineRevocationEntry(delegation.revocationId, "auto revoke on expiry", timeTick);
+    setRevocationQueue((current) => enqueueOfflineRevocation(current, entry));
+    setDelegation(null);
+    setActionNote("UCAN expired and was queued for revocation replay.");
+  }, [delegation, timeTick]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -689,7 +709,13 @@ export const App = () => {
               <div className="alert-row">
                 <span>{delegation ? formatDidHandle(delegation.audienceDid) : "No UCAN delegation"}</span>
                 <span className="muted">
-                  {delegation ? (isUcanDelegationExpired(delegation) ? "UCAN Expired" : "UCAN Active") : "Delegate Access"}
+                  {delegation
+                    ? isUcanDelegationExpired(delegation, timeTick)
+                      ? "UCAN Expired"
+                      : isUcanDelegationExpiringSoon(delegation, 5 * 60 * 1000, timeTick)
+                        ? "UCAN Expiring Soon"
+                        : "UCAN Active"
+                    : "Delegate Access"}
                 </span>
               </div>
               {delegation && (
